@@ -1,5 +1,7 @@
 # Feishu Docs & Drive Supplement
 
+[中文文档](README.zh-CN.md) | English
+
 A Feishu supplement for cc-connect with inherited configuration, CLI/MCP/chat entrypoints, a single-link user-authorization flow, and practical operations for Drive, Upload, Docs, Sheets, and Bitable.
 
 ## What this project provides

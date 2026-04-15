@@ -21,6 +21,7 @@ dev = [
 
 [project.scripts]
 feishu = "cc_feishu.cli:main"
+feishu-auth-setup = "cc_feishu.scripts.auth_setup:main"
 cc-feishu-mcp = "cc_feishu.mcp.server:main"
 cc-feishu-chat = "cc_feishu.chat_router:main"
 

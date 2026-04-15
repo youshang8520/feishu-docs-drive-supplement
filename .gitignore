@@ -4,3 +4,13 @@ dist/
 .pytest_cache/
 __pycache__/
 *.pyc
+
+# Local configuration
+.claude/
+!.claude/*.example
+*.local.json
+.isolation_e2e_test/
+
+# Personal paths and credentials
+.env
+.env.local

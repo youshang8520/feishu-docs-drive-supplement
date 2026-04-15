@@ -1,8 +1,10 @@
-# Feishu 权限范围建议
+# Feishu Permission Scopes Recommendation
 
-为了完成本补丁要求的真实联调（Drive/Upload/Docs/Sheets/Bitable 的创建、读取、更新、删除），建议在飞书应用中开通以下最小权限。
+[English](scopes.md) | [中文](scopes.zh-CN.md)
 
-## 1) Drive / Upload / Docs 删除相关
+To complete the real integration required by this supplement (Drive/Upload/Docs/Sheets/Bitable create, read, update, delete), it is recommended to enable the following minimum permissions in your Feishu app.
+
+## 1) Drive / Upload / Docs Deletion
 
 - `drive:drive`
 - `space:folder:create`
@@ -10,21 +12,21 @@
 - `drive:file:upload`
 - `space:document:delete`
 
-## 2) Docs（Docx）读写
+## 2) Docs (Docx) Read/Write
 
 - `docs:document:read`
 - `docs:document:write`
 
-> 说明：当前代码已使用 Docx blocks 接口完成追加/更新写入；若仅缺删除能力，主要补 `space:document:delete`。
+> Note: Current code uses Docx blocks API for append/update writes; if only deletion capability is missing, mainly add `space:document:delete`.
 
-## 3) Sheets（表格）
+## 3) Sheets (Spreadsheet)
 
 - `sheets:spreadsheet`
 - `sheets:spreadsheet:create`
-- `sheets:spreadsheet:read`（或对应 readonly）
-- `drive:drive`（表格创建/访问依赖）
+- `sheets:spreadsheet:read` (or corresponding readonly)
+- `drive:drive` (spreadsheet creation/access dependency)
 
-## 4) Bitable（多维表格）
+## 4) Bitable (Multi-dimensional Table)
 
 - `bitable:app`
 - `bitable:app:readonly`
@@ -35,7 +37,7 @@
 - `base:record:update`
 - `base:record:delete`
 
-## 5) 使用建议
+## 5) Usage Recommendations
 
-- 按最小必要原则开通；如果只验证部分能力，只开对应 scope。
-- scope 开通后，重新执行全量真实 CRUD 验证矩阵，再决定是否发布。
+- Enable based on minimum necessary principle; if only verifying partial capabilities, only enable corresponding scopes.
+- After enabling scopes, re-run full real CRUD verification matrix before deciding to publish.
