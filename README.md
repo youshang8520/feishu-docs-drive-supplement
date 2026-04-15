@@ -14,10 +14,8 @@ A Feishu supplement for cc-connect with inherited configuration, CLI/MCP/chat en
 - Supports user authorization with:
   - `auth status`
   - `auth start`
-  - `auth send-link`
   - `auth poll`
   - `auth import`
-- Can send the authorization link directly into a Feishu chat when `receive_id` is provided.
 - Provides practical support for:
   - Drive
   - Upload
@@ -66,13 +64,13 @@ Check auth state:
 python -m cc_feishu.cli auth status
 ```
 
-Send the authorization link directly to a Feishu user or chat:
+Start authorization (generates link to open in browser):
 
 ```bash
-python -m cc_feishu.cli auth send-link --receive-id <target> --receive-id-type open_id
+python -m cc_feishu.cli auth start
 ```
 
-Complete polling after the user authorizes:
+Complete polling after you authorize:
 
 ```bash
 python -m cc_feishu.cli auth poll --timeout 600
@@ -94,7 +92,7 @@ python -m cc_feishu.cli bitable list-fields --app <app_token> --table <table_id>
 - Docs: create / read / read-blocks / append / append-heading / append-bullet / append-styled / update / delete
 - Sheets: create / read-range / write / append-rows / delete-range
 - Bitable: list-tables / list-fields / create-table / read-records / create-record / update-record / delete-record
-- Auth: inherited config + single-link auth bootstrap + pending-auth reuse + direct auth-link delivery
+- Auth: inherited config + single-link auth bootstrap + pending-auth reuse
 
 ### Current boundaries
 - Drive rename is not yet confirmed as a stable supported API shape.

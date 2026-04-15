@@ -26,7 +26,6 @@ The package inherits app credentials and an optional tenant token from cc-connec
 ### User auth bootstrap
 The package supports a user-authorization flow with:
 - `auth.start` to generate a verification link
-- `auth.send_link` to deliver that link to a Feishu user or chat when `receive_id` is known
 - `auth.poll` to complete authorization and persist refresh/access tokens
 
 This enables a low-friction flow for both direct CLI usage and higher-level chat integrations.
@@ -37,7 +36,6 @@ This repo does not include:
 - a hosted webhook runtime
 - multi-user session orchestration
 
-It can generate the authorization link, expose it to an outer integration, and also send it directly through Feishu when a target `receive_id` is supplied.
 
 ## 3. Current capability matrix
 
@@ -121,19 +119,19 @@ Not yet implemented:
 The intended experience is:
 1. user installs the supplement
 2. config is inherited from cc-connect automatically
-3. user runs a fixed command such as `/feishu auth` or `feishu auth send-link ...`
-4. the supplement generates or sends the authorization link
+3. user runs a fixed command such as `/feishu auth` or `feishu auth start`
+4. the supplement generates the authorization link
 5. after user authorizes, the supplement completes `auth.poll`
 6. Feishu resource features become available
 
-This repo already provides the auth bootstrap, pending-auth persistence, direct auth-link delivery helper, CLI/MCP entrypoints, and fixed command router needed for that flow.
+This repo already provides the auth bootstrap, pending-auth persistence, CLI/MCP entrypoints, and fixed command router needed for that flow.
 
 ## 5. Current package positioning
 
 The package should be described as:
 - a reusable Feishu supplement for cc-connect
 - with inherited auth/config
-- with direct auth-link delivery and fixed command routing
+- with fixed command routing
 - with strong Drive / Upload / Sheets / Bitable support
 - with basic-to-mid-level Docs support
 - not a full standalone hosted bot runtime

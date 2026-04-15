@@ -7,7 +7,6 @@ A Python supplement package for cc-connect that adds Feishu Docs, Drive, Sheets,
 - Inherits Feishu app configuration from an existing cc-connect config.
 - Adds CLI, MCP, and chat-router entrypoints for Feishu resource operations.
 - Supports a single-link user-authorization flow.
-- Can send the authorization link directly to a Feishu user or chat when a target `receive_id` is supplied.
 - Provides practical operations for:
   - Drive
   - Upload
@@ -63,13 +62,7 @@ Start auth and print the verification link:
 python -m cc_feishu.cli auth start
 ```
 
-Send the authorization link directly into Feishu:
-
-```bash
-python -m cc_feishu.cli auth send-link --receive-id <target> --receive-id-type open_id
-```
-
-Complete authorization after the user approves:
+Complete authorization after you approve:
 
 ```bash
 python -m cc_feishu.cli auth poll --timeout 600
@@ -83,14 +76,12 @@ For a higher-level chat or command host, the intended flow is:
 
 ```bash
 cc-feishu-chat "/feishu auth"
-cc-feishu-chat "/feishu auth send-link --receive-id <target> --receive-id-type open_id"
 cc-feishu-chat "/feishu auth poll --timeout 600"
 ```
 
 Behavior:
 - `cc-feishu-chat "/feishu auth"` returns structured JSON including `verification_uri_complete`
 - pending auth is cached locally and can be reused
-- `auth send-link` can deliver the link directly to Feishu
 - `poll` can resume without the caller resending `device_code`
 
 ## Slash-command compatibility path
@@ -126,7 +117,6 @@ This is the preferred compatibility path because it layers on top of the officia
 #### Auth
 - `auth.status`
 - `auth.start`
-- `auth.send_link`
 - `auth.poll`
 - `auth.import`
 
@@ -166,7 +156,7 @@ This is the preferred compatibility path because it layers on top of the officia
 - `cc-feishu-chat`
   - parses fixed `/feishu ...` style commands
   - returns structured JSON for an outer chat layer
-  - supports auth-link generation and auth-link delivery
+  - supports auth-link generation
   - provides a compatibility layer without modifying official cc-connect
 
 ## Current boundaries
@@ -174,4 +164,4 @@ This is the preferred compatibility path because it layers on top of the officia
 - `docs.update` supports precise block-text updates when a `block_id` is provided; without `block_id`, it falls back to append semantics.
 - Docs support append helpers for headings, bullets, and simple styled text runs, but do not yet expose a full rich table/image abstraction layer.
 - Drive rename is not yet confirmed as a stable supported API shape.
-- The package includes direct auth-link delivery and a fixed command router, but it is not a standalone long-running bot server or multi-user session manager.
+- The package includes a fixed command router, but it is not a standalone long-running bot server or multi-user session manager.

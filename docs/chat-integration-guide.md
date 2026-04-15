@@ -10,7 +10,6 @@ It provides:
 - Feishu resource operations
 - MCP tools for upper-layer integrations
 - a single-link user authorization bootstrap
-- direct auth-link delivery helpers
 - a lightweight chat-command router (`cc-feishu-chat`) that parses fixed `/feishu ...` style commands and returns structured JSON responses
 - a discoverable skill wrapper under `skills/feishu/SKILL.md` for runtimes that support workspace skill discovery
 
@@ -23,7 +22,7 @@ An outer chat integration is still responsible for:
 
 Suggested fixed commands:
 - `/feishu auth`
-- `/feishu auth send-link --receive-id <target> --receive-id-type open_id`
+- `/feishu auth start`
 - `/feishu auth poll --timeout 600`
 - `/feishu drive list --folder root`
 - `/feishu docs append --doc <doc_token> --text "hello"`
@@ -60,23 +59,6 @@ Step 4 — after the user authorizes, outer layer completes polling:
 ```bash
 cc-feishu-chat "/feishu auth poll --timeout 600"
 ```
-
-### Option B — send the link directly through Feishu
-
-If the integration already knows the target user or chat id, it can send the link directly:
-
-```bash
-cc-feishu-chat "/feishu auth send-link --receive-id <target> --receive-id-type open_id"
-```
-
-Equivalent CLI flow:
-
-```bash
-python -m cc_feishu.cli auth send-link --receive-id <target> --receive-id-type open_id
-python -m cc_feishu.cli auth poll --timeout 600
-```
-
-This path lets the supplement generate and deliver the authorization link without requiring the outer layer to compose the Feishu message body itself.
 
 ## 4. Workspace skill compatibility path
 
@@ -149,7 +131,6 @@ cc-feishu-chat "/feishu bitable update-record --app app_token --table table_id -
 
 ## 8. Current known boundaries
 
-- The package can parse fixed commands and can send auth links directly when given a target `receive_id`, but it does not provide a standalone inbound webhook server.
 - Multi-user session orchestration is not implemented inside this repo.
 - Drive rename remains an unresolved API-shape problem.
 - Docs block deletion and richer table/image abstractions are not yet implemented.

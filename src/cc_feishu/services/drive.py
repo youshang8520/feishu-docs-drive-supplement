@@ -10,11 +10,14 @@ class DriveService:
     def __init__(self, client: FeishuHttpClient):
         self._client = client
 
-    def list_folder(self, folder_token: str, page_token: str | None = None) -> dict[str, Any]:
+    def list_folder(self, folder_token: str | None = None, page_token: str | None = None) -> dict[str, Any]:
         params: dict[str, Any] = {
-            "folder_token": folder_token,
             "page_size": 50,
         }
+        # Only add folder_token if it's provided and not "root"
+        # Feishu API lists root directory when folder_token is omitted
+        if folder_token and folder_token.lower() != "root":
+            params["folder_token"] = folder_token
         if page_token:
             params["page_token"] = page_token
         return self._client.get("/open-apis/drive/v1/files", params=params, auth_preference="user")

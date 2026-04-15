@@ -123,35 +123,6 @@ def _start_or_reuse_pending_auth(
     save_pending_auth_state(pending)
     return pending
 
-
-def _send_auth_link(
-    config: Any,
-    provider: FeishuTokenProvider,
-    receive_id: str,
-    *,
-    receive_id_type: str = "chat_id",
-    custom_text: str = "",
-    mode: str = "user",
-    scope: str = DEFAULT_AUTH_SCOPE,
-    force: bool = False,
-) -> dict[str, Any]:
-    pending = _start_or_reuse_pending_auth(provider, mode=mode, scope=scope, force=force)
-    client = init_provider(config)
-    messages = MessagesService(client)
-    text = _auth_message_text(pending, custom_text)
-    send_result = messages.send_text(receive_id, text, receive_id_type=receive_id_type)
-    return {
-        **_pending_auth_response(pending),
-        "ok": True,
-        "tool": "auth.send_link",
-        "status": "pending_authorization",
-        "message": "Sent Feishu authorization link.",
-        "reply": text,
-        "receive_id": receive_id,
-        "receive_id_type": receive_id_type,
-        "sent_message": send_result,
-    }
-
 def _build_parser() -> _ChatParser:
     parser = _ChatParser(prog="/feishu", add_help=False)
     sub = parser.add_subparsers(dest="resource")
@@ -161,14 +132,6 @@ def _build_parser() -> _ChatParser:
     auth_sub.add_parser("status", add_help=False)
 
     p = auth_sub.add_parser("start", add_help=False)
-    p.add_argument("--scope", default=DEFAULT_AUTH_SCOPE)
-    p.add_argument("--mode", default="user")
-    p.add_argument("--force", action="store_true")
-
-    p = auth_sub.add_parser("send-link", add_help=False)
-    p.add_argument("--receive-id", required=True)
-    p.add_argument("--receive-id-type", default="chat_id")
-    p.add_argument("--text", default="")
     p.add_argument("--scope", default=DEFAULT_AUTH_SCOPE)
     p.add_argument("--mode", default="user")
     p.add_argument("--force", action="store_true")
@@ -367,21 +330,6 @@ def route_command(command: str) -> dict[str, Any]:
                     "tool": "auth.start",
                     "command": command,
                     **_pending_auth_response(pending),
-                }
-            if args.action == "send-link":
-                result = _send_auth_link(
-                    config,
-                    provider,
-                    args.receive_id,
-                    receive_id_type=args.receive_id_type,
-                    custom_text=args.text,
-                    mode=args.mode,
-                    scope=args.scope,
-                    force=args.force,
-                )
-                return {
-                    **result,
-                    "command": command,
                 }
             if args.action == "poll":
                 pending = load_pending_auth_state()

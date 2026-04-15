@@ -124,32 +124,6 @@ def _start_or_reuse_pending_auth(
     return pending
 
 
-def _send_auth_link(
-    config: Any,
-    provider: FeishuTokenProvider,
-    receive_id: str,
-    *,
-    receive_id_type: str = "chat_id",
-    custom_text: str = "",
-    mode: str = "user",
-    scope: str = DEFAULT_AUTH_SCOPE,
-    force: bool = False,
-) -> dict[str, Any]:
-    pending = _start_or_reuse_pending_auth(provider, mode=mode, scope=scope, force=force)
-    client = init_provider(config)
-    messages = MessagesService(client)
-    text = _auth_message_text(pending, custom_text)
-    send_result = messages.send_text(receive_id, text, receive_id_type=receive_id_type)
-    return {
-        **_pending_auth_response(pending),
-        "ok": True,
-        "status": "pending_authorization",
-        "message": "Sent Feishu authorization link.",
-        "receive_id": receive_id,
-        "receive_id_type": receive_id_type,
-        "sent_message": send_result,
-    }
-
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="feishu", description="Feishu docs/drive supplement")
     parser.add_argument("--validate", action="store_true", help="validate env and connectivity")
@@ -169,14 +143,6 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--refresh-expires-at", type=int, default=0)
     p.add_argument("--open-id", default="")
     p.add_argument("--mode", choices=["auto", "user"], default="user")
-
-    p = auth_sub.add_parser("send-link")
-    p.add_argument("--receive-id", required=True)
-    p.add_argument("--receive-id-type", default="chat_id")
-    p.add_argument("--text", default="")
-    p.add_argument("--scope", default=DEFAULT_AUTH_SCOPE)
-    p.add_argument("--mode", choices=["auto", "user"], default="user")
-    p.add_argument("--force", action="store_true")
 
     p = auth_sub.add_parser("login")
     p.add_argument("--scope", default=DEFAULT_AUTH_SCOPE)
@@ -401,19 +367,6 @@ def main(argv: list[str] | None = None) -> int:
                         "has_user_access_token": bool(updated.user_access_token),
                         "user_open_id": updated.user_open_id,
                     }
-                )
-            elif args.action == "send-link":
-                _print(
-                    _send_auth_link(
-                        config,
-                        provider,
-                        args.receive_id,
-                        receive_id_type=args.receive_id_type,
-                        custom_text=args.text,
-                        mode=args.mode,
-                        scope=args.scope,
-                        force=args.force,
-                    )
                 )
             elif args.action == "login":
                 pending = _start_or_reuse_pending_auth(

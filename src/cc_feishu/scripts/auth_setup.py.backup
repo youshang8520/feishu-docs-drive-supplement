@@ -1,0 +1,429 @@
+#!/usr/bin/env python3
+"""
+One-click Feishu authorization setup script.
+
+This script automatically:
+1. Inherits app_id and app_secret from cc-connect config
+2. Configures MCP server in .claude/mcp.json
+3. Copies workspace skill to skills/feishu/
+4. Generates authorization link with all required scopes
+5. Waits for user authorization
+6. Completes authorization and saves tokens
+
+Usage:
+    feishu-auth-setup
+"""
+import json
+import os
+import shutil
+import sys
+import time
+from pathlib import Path
+
+try:
+    from cc_feishu.auth.token_provider import FeishuTokenProvider
+    from cc_feishu.config import (
+        FeishuConfig,
+        clear_pending_auth_state,
+        load_config,
+        load_pending_auth_state,
+        save_pending_auth_state,
+    )
+    from cc_feishu.services.messages import MessagesService
+    from cc_feishu.client.http import FeishuHttpClient
+except ImportError:
+    print("Error: cc_feishu package not installed. Please run: pip install -e .")
+    sys.exit(1)
+
+
+# All required scopes for Drive, Docs, Sheets, Bitable
+DEFAULT_SCOPES = (
+    "drive:drive "
+    "drive:drive.readonly "
+    "drive:drive.metadata:readonly "
+    "drive:file "
+    "drive:file:upload "
+    "drive:file:download "
+    "space:folder:create "
+    "space:document:delete "
+    "docs:document:read "
+    "docs:document:write "
+    "docs:document:copy "
+    "docs:document.comment:read "
+    "docs:document.comment:create "
+    "docs:document.comment:update "
+    "docs:document.comment:delete "
+    "docs:document.media:upload "
+    "docs:document.media:download "
+    "docx:document "
+    "docx:document:create "
+    "docx:document:readonly "
+    "docx:document:write_only "
+    "sheets:spreadsheet "
+    "sheets:spreadsheet:create "
+    "sheets:spreadsheet:read "
+    "sheets:spreadsheet:readonly "
+    "bitable:app "
+    "bitable:app:readonly "
+    "wiki:space:read "
+    "wiki:space:retrieve "
+    "wiki:space:write_only "
+    "wiki:node:read "
+    "wiki:node:retrieve "
+    "wiki:node:create "
+    "wiki:node:copy "
+    "wiki:node:update "
+    "wiki:wiki:readonly "
+    "board:whiteboard:node:read "
+    "board:whiteboard:node:create "
+    "board:whiteboard:node:delete "
+    "docs:permission.member:auth "
+    "docs:permission.member:create "
+    "docs:permission.member:transfer "
+    "docs:event:subscribe "
+    "auth:user.id:read "
+    "offline_access"
+)
+
+SKILL_CONTENT = """---
+name: feishu
+description: Feishu Drive, Docs, Sheets, and Bitable operations. Use this to list/create/read/update files and documents in Feishu.
+argument-hint: "[operation] [arguments]"
+allowed-tools: []
+category: Integration
+version: 0.1.0
+user-invocable: false
+disable-model-invocation: false
+homepage: https://github.com/youshang8520/feishu-docs-drive-supplement
+metadata: {"mcp_server":"feishu"}
+---
+
+# Feishu Integration
+
+This skill provides access to Feishu Drive, Docs, Sheets, and Bitable through the MCP server.
+
+## Available Operations
+
+The MCP server `feishu` provides these tools automatically. You can use them directly without invoking this skill.
+
+### Drive Operations
+- `drive.list` - List files in a folder (use folder_token="root" for root directory)
+- `drive.create_folder` - Create a new folder
+- `drive.read` - Read file metadata
+- `drive.move` - Move files/folders
+- `drive.delete` - Delete files/folders
+
+### Docs Operations
+- `docs.create` - Create a new document
+- `docs.read` - Read document metadata
+- `docs.read_blocks` - List all blocks in a document
+- `docs.append` - Append plain text
+- `docs.append_heading` - Append heading (level 1-9)
+- `docs.append_bullet` - Append bullet list item
+- `docs.append_styled` - Append styled text (bold/italic/underline)
+- `docs.update` - Update block text (requires block_id)
+- `docs.delete` - Delete a document
+
+### Sheets Operations
+- `sheets.create` - Create a new spreadsheet
+- `sheets.read_range` - Read cell range (e.g., "A1:B10")
+- `sheets.write` - Write to cell range
+- `sheets.append_rows` - Append rows to range
+- `sheets.delete_range` - Delete/clear cell range
+
+### Bitable Operations
+- `bitable.list_tables` - List all tables in a bitable
+- `bitable.list_fields` - List fields in a table
+- `bitable.create_table` - Create a new table
+- `bitable.read_records` - Read records from a table
+- `bitable.create_record` - Create a new record
+- `bitable.update_record` - Update a record
+- `bitable.delete_record` - Delete a record
+
+### Upload Operations
+- `upload.bytes` - Upload file content to Drive
+
+### Authorization
+- `auth.status` - Check authorization status
+- `auth.start` - Start device authorization flow
+- `auth.poll` - Poll for authorization completion
+- `auth.import` - Import existing tokens
+
+## Usage Notes
+
+1. **Authorization**: Run `feishu-auth-setup` once to authorize. Tokens auto-refresh.
+2. **Root folder**: Use `folder_token="root"` or omit folder_token to list root directory
+3. **Token parameters**: Most operations require token parameters (doc_token, sheet_token, app_token, etc.)
+4. **MCP Integration**: This skill is backed by the `feishu` MCP server defined in `.claude/mcp.json`
+
+## Examples
+
+When user asks to list drive files:
+```
+Use mcp__feishu__drive.list with {"folder_token": "root"}
+```
+
+When user asks to create a document:
+```
+Use mcp__feishu__docs.create with {"title": "Document Title"}
+```
+
+When user asks to read a document:
+```
+Use mcp__feishu__docs.read_blocks with {"doc_token": "<token>"}
+```
+"""
+
+
+def setup_mcp_config(project_dir: Path) -> bool:
+    """Setup MCP configuration in .claude/mcp.json"""
+    claude_dir = project_dir / ".claude"
+    mcp_file = claude_dir / "mcp.json"
+
+    # Create .claude directory if it doesn't exist
+    claude_dir.mkdir(exist_ok=True)
+
+    # Check if mcp.json already exists
+    if mcp_file.exists():
+        try:
+            with open(mcp_file, "r", encoding="utf-8") as f:
+                config = json.load(f)
+        except Exception:
+            config = {}
+    else:
+        config = {}
+
+    # Ensure mcpServers exists
+    if "mcpServers" not in config:
+        config["mcpServers"] = {}
+
+    # Add or update feishu server
+    config["mcpServers"]["feishu"] = {
+        "command": "cc-feishu-mcp",
+        "args": [],
+        "env": {},
+        "disabled": False
+    }
+
+    # Write config
+    try:
+        with open(mcp_file, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"  ✗ Failed to write MCP config: {e}")
+        return False
+
+
+def setup_workspace_skill(project_dir: Path) -> bool:
+    """Setup workspace skill in skills/feishu/SKILL.md"""
+    skills_dir = project_dir / "skills" / "feishu"
+    skill_file = skills_dir / "SKILL.md"
+
+    # Create skills/feishu directory if it doesn't exist
+    skills_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write skill file
+    try:
+        with open(skill_file, "w", encoding="utf-8") as f:
+            f.write(SKILL_CONTENT)
+        return True
+    except Exception as e:
+        print(f"  ✗ Failed to write skill file: {e}")
+        return False
+
+
+def main():
+    print("=" * 60)
+    print("Feishu Authorization Setup")
+    print("=" * 60)
+    print()
+
+    # Detect project directory
+    project_dir = Path.cwd()
+    print(f"[1/7] Detecting project directory...")
+    print(f"  → Working directory: {project_dir}")
+
+    # Setup MCP configuration
+    print("\n[2/7] Setting up MCP configuration...")
+    if setup_mcp_config(project_dir):
+        print(f"  ✓ MCP config written to {project_dir / '.claude' / 'mcp.json'}")
+    else:
+        print("  ⚠ MCP config setup failed, but continuing...")
+
+    # Setup workspace skill
+    print("\n[3/7] Setting up workspace skill...")
+    if setup_workspace_skill(project_dir):
+        print(f"  ✓ Skill file written to {project_dir / 'skills' / 'feishu' / 'SKILL.md'}")
+    else:
+        print("  ⚠ Skill setup failed, but continuing...")
+
+    # Load config
+    print("\n[4/7] Loading configuration...")
+    config = load_config()
+
+    if not config.app_id or not config.app_secret:
+        print("Error: Missing app_id or app_secret in cc-connect config.")
+        print("Please configure cc-connect first:")
+        print("  ~/.cc-connect/config.toml")
+        sys.exit(1)
+
+    print(f"  ✓ Inherited from cc-connect: app_id={config.app_id[:10]}...")
+
+    # Initialize token provider
+    provider = FeishuTokenProvider(config)
+
+    # Check if already authorized
+    print("\n[5/7] Checking authorization status...")
+    now = int(time.time())
+    has_refresh_token = bool(config.user_refresh_token.strip())
+    access_token_valid = bool(config.user_access_token.strip()) and now < config.user_token_expires_at - 60
+
+    if has_refresh_token:
+        if access_token_valid:
+            print("  ✓ Already authorized and token is valid")
+            print(f"  ✓ User: {config.user_open_id}")
+            print(f"  ✓ Token expires: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(config.user_token_expires_at))}")
+            print("\n" + "=" * 60)
+            print("Setup complete! Authorization is active.")
+            print("Tokens will auto-refresh when needed.")
+            print()
+            print("You can now use Feishu features in Claude Code conversations.")
+            print("Just ask naturally:")
+            print("  - 'List my Feishu drive files'")
+            print("  - 'Create a document called Meeting Notes'")
+            print("  - 'Read the document at <url>'")
+            print("=" * 60)
+            return 0
+        else:
+            print("  → Access token expired, refreshing...")
+            try:
+                # Force refresh
+                new_token = provider.get_user_token(force_refresh=True)
+                print("  ✓ Token refreshed successfully")
+                print("\n" + "=" * 60)
+                print("Setup complete! Authorization refreshed.")
+                print()
+                print("You can now use Feishu features in Claude Code conversations.")
+                print("=" * 60)
+                return 0
+            except Exception as e:
+                print(f"  ✗ Refresh failed: {e}")
+                print("  → Will start new authorization flow...")
+
+    # Check if user_open_id is already known
+    has_user_open_id = bool(config.user_open_id.strip())
+
+    # Start device authorization
+    print("\n[6/7] Starting authorization flow...")
+    try:
+        auth_data = provider.start_device_authorization(DEFAULT_SCOPES)
+    except Exception as e:
+        print(f"Error: Failed to start authorization: {e}")
+        sys.exit(1)
+
+    device_code = auth_data.get("device_code", "")
+    verification_uri_complete = auth_data.get("verification_uri_complete", "")
+    interval = auth_data.get("interval", 5)
+
+    if not device_code or not verification_uri_complete:
+        print("Error: Invalid authorization response from Feishu")
+        sys.exit(1)
+
+    # Save pending auth state
+    save_pending_auth_state({
+        "device_code": device_code,
+        "verification_uri_complete": verification_uri_complete,
+        "interval": interval,
+        "expires_at": int(time.time()) + auth_data.get("expires_in", 900),
+    })
+
+    print("  ✓ Authorization link generated")
+
+    # Send link or display it
+    print("\n[7/7] Delivering authorization link...")
+
+    if has_user_open_id:
+        # Send to Feishu
+        print(f"  → Sending to your Feishu (open_id: {config.user_open_id[:10]}...)")
+        try:
+            client = FeishuHttpClient(config)
+            msg_service = MessagesService(client)
+            result = msg_service.send_text(
+                config.user_open_id,
+                f"请点击链接完成飞书授权：{verification_uri_complete}",
+                receive_id_type="open_id"
+            )
+            if result.get("code") == 0:
+                print("  ✓ Authorization link sent to your Feishu")
+                print("\n  Please check your Feishu and click the authorization link.")
+            else:
+                print(f"  ✗ Failed to send: {result}")
+                print(f"\n  Please open this link manually:\n  {verification_uri_complete}")
+        except Exception as e:
+            print(f"  ✗ Failed to send: {e}")
+            print(f"\n  Please open this link manually:\n  {verification_uri_complete}")
+    else:
+        # First time: display link
+        print("  → First-time setup detected")
+        print("\n" + "=" * 60)
+        print("Please copy the following link and open it in your browser:")
+        print()
+        print(f"  {verification_uri_complete}")
+        print()
+        print("=" * 60)
+
+    # Wait for user to authorize
+    print("\nWaiting for authorization...")
+    print("  (Press Ctrl+C to cancel)")
+    input("\n  Press Enter after you have authorized in Feishu/browser...")
+
+    # Poll for authorization
+    print("\nChecking authorization status...")
+    try:
+        result = provider.poll_device_authorization(
+            device_code,
+            interval_seconds=interval,
+            timeout_seconds=60,
+            auth_mode="user"
+        )
+    except Exception as e:
+        print(f"  ✗ Authorization failed: {e}")
+        print("\n  Please try again or check your authorization status.")
+        sys.exit(1)
+
+    if not result.get("ok"):
+        print("  ✗ Authorization incomplete")
+        sys.exit(1)
+
+    # Clear pending auth
+    clear_pending_auth_state()
+
+    print("  ✓ Authorization successful!")
+    print(f"  ✓ User: {result.get('user_info', {}).get('name', 'Unknown')}")
+    print(f"  ✓ Open ID: {result.get('user_open_id', 'Unknown')}")
+
+    # Done
+    print("\nSetup complete!")
+    print()
+    print("=" * 60)
+    print("You can now use Feishu features in Claude Code conversations.")
+    print()
+    print("Just ask naturally:")
+    print("  - 'List my Feishu drive files'")
+    print("  - 'Create a document called Meeting Notes'")
+    print("  - 'Read the document at <url>'")
+    print()
+    print("Your tokens will auto-refresh. No need to authorize again.")
+    print("=" * 60)
+    print()
+
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\nCancelled by user.")
+        sys.exit(1)

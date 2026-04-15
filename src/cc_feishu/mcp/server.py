@@ -59,58 +59,25 @@ def _auth_status(config: Any) -> dict[str, Any]:
     }
 
 
-def _build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="cc-feishu-mcp", description="Feishu MCP bridge")
-    p.add_argument("tool", help="tool name")
-    p.add_argument("--payload", default="{}", help="json payload")
-    return p
+def _auth_start(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[str, Any]:
+    scope = payload.get("scope") or DEFAULT_AUTH_SCOPE
+    mode = payload.get("mode") or "user"
+    force = payload.get("force", False)
 
-
-def _parse_payload(raw: str) -> dict:
-    data = json.loads(raw)
-    if not isinstance(data, dict):
-        raise ValueError("payload must be a json object")
-    return data
-
-
-def _pending_auth_response(config: Any, pending: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "ok": True,
-        "status": "pending_authorization",
-        "message": "Open the verification URL and complete Feishu authorization.",
-        "auth_mode": str(pending.get("auth_mode") or "user"),
-        "scope": pending.get("scope") or DEFAULT_AUTH_SCOPE,
-        "verification_uri": pending.get("verification_uri"),
-        "verification_uri_complete": pending.get("verification_uri_complete") or pending.get("verification_uri"),
-        "user_code": pending.get("user_code"),
-        "device_code": pending.get("device_code"),
-        "expires_in": max(0, int(pending.get("expires_at", 0) or 0) - int(time.time())),
-        "interval": pending.get("interval") or 5,
-        "pending_auth_file": str(PENDING_AUTH_FILE),
-    }
-
-
-def _auth_message_text(pending: dict[str, Any], custom_text: str = "") -> str:
-    link = str(pending.get("verification_uri_complete") or pending.get("verification_uri") or "").strip()
-    if not link:
-        raise ValidationError("verification link is missing")
-    if custom_text.strip():
-        return custom_text.strip().replace("{link}", link)
-    return f"请点击链接完成飞书授权：{link}"
-
-
-def _start_or_reuse_pending_auth(
-    provider: FeishuTokenProvider,
-    *,
-    mode: str = "user",
-    scope: str = DEFAULT_AUTH_SCOPE,
-    force: bool = False,
-) -> dict[str, Any]:
     pending = load_pending_auth_state()
     now = int(time.time())
     pending_active = bool(pending.get("device_code")) and now < int(pending.get("expires_at", 0) or 0)
+
     if pending_active and not force:
-        return pending
+        link = pending.get("verification_uri_complete") or pending.get("verification_uri")
+        return {
+            "ok": True,
+            "status": "pending_authorization",
+            "message": "Reusing existing pending authorization.",
+            "verification_uri_complete": link,
+            "device_code": pending.get("device_code"),
+            "expires_in": max(0, int(pending.get("expires_at", 0)) - now),
+        }
 
     started = provider.start_device_authorization(scope)
     pending = {
@@ -125,225 +92,319 @@ def _start_or_reuse_pending_auth(
         "expires_at": now + int(started.get("expires_in") or 900),
     }
     save_pending_auth_state(pending)
-    return pending
 
-
-def _send_auth_link(
-    config: Any,
-    provider: FeishuTokenProvider,
-    receive_id: str,
-    *,
-    receive_id_type: str = "chat_id",
-    custom_text: str = "",
-    mode: str = "user",
-    scope: str = DEFAULT_AUTH_SCOPE,
-    force: bool = False,
-) -> dict[str, Any]:
-    pending = _start_or_reuse_pending_auth(provider, mode=mode, scope=scope, force=force)
-    client = init_provider(config)
-    messages = MessagesService(client)
-    text = _auth_message_text(pending, custom_text)
-    send_result = messages.send_text(receive_id, text, receive_id_type=receive_id_type)
     return {
-        **_pending_auth_response(config, pending),
         "ok": True,
         "status": "pending_authorization",
-        "message": "Sent Feishu authorization link.",
-        "receive_id": receive_id,
-        "receive_id_type": receive_id_type,
-        "sent_message": send_result,
+        "message": "Authorization started. Please visit the verification URL.",
+        "verification_uri_complete": pending["verification_uri_complete"],
+        "device_code": pending["device_code"],
+        "expires_in": pending["expires_in"],
     }
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = _build_parser()
-    args = parser.parse_args(argv)
+def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[str, Any]:
+            _print(result)
+            return
 
-    config = load_config()
-    payload = _parse_payload(args.payload)
-    tool = args.tool
+        if args.tool == "auth.import":
+            # Import existing tokens
+            user_access_token = payload.get("user_access_token", "")
+            user_refresh_token = payload.get("user_refresh_token", "")
+            user_token_expires_at = payload.get("user_token_expires_at", 0)
+            user_refresh_expires_at = payload.get("user_refresh_expires_at", 0)
+            user_open_id = payload.get("user_open_id", "")
 
-    if tool.startswith("auth."):
-        provider = FeishuTokenProvider(config)
-        try:
-            if tool == "auth.status":
-                _print(_auth_status(config))
-            elif tool == "auth.import":
-                mode = str(payload.get("mode") or "user").strip() or "user"
-                updated = replace(
-                    config,
-                    auth_mode=mode,
-                    user_access_token=str(payload.get("access_token") or "").strip(),
-                    user_refresh_token=str(payload.get("refresh_token") or "").strip(),
-                    user_token_expires_at=int(payload.get("expires_at") or 0),
-                    user_refresh_expires_at=int(payload.get("refresh_expires_at") or 0),
-                    user_open_id=str(payload.get("open_id") or "").strip(),
-                )
-                save_user_auth_state(updated)
-                clear_pending_auth_state()
-                _print(
-                    {
-                        "ok": True,
-                        "message": f"Imported user auth into {USER_AUTH_FILE}",
-                        "auth_mode": updated.auth_mode,
-                        "has_user_refresh_token": bool(updated.user_refresh_token),
-                        "has_user_access_token": bool(updated.user_access_token),
-                        "user_open_id": updated.user_open_id,
-                    }
-                )
-            elif tool == "auth.start":
-                mode = str(payload.get("mode") or "user").strip() or "user"
-                scope = str(payload.get("scope") or DEFAULT_AUTH_SCOPE).strip() or DEFAULT_AUTH_SCOPE
-                force = bool(payload.get("force") is True)
-                pending = _start_or_reuse_pending_auth(provider, mode=mode, scope=scope, force=force)
-                _print(_pending_auth_response(config, pending))
-            elif tool == "auth.send_link":
-                result = _send_auth_link(
-                    config,
-                    provider,
-                    str(payload.get("receive_id") or "").strip(),
-                    receive_id_type=str(payload.get("receive_id_type") or "chat_id"),
-                    custom_text=str(payload.get("text") or ""),
-                    mode=str(payload.get("mode") or "user").strip() or "user",
-                    scope=str(payload.get("scope") or DEFAULT_AUTH_SCOPE).strip() or DEFAULT_AUTH_SCOPE,
-                    force=bool(payload.get("force") is True),
-                )
-                _print(result)
-            elif tool == "auth.poll":
-                pending = load_pending_auth_state()
-                device_code = str(payload.get("device_code") or pending.get("device_code") or "").strip()
-                if not device_code:
-                    raise ValidationError("device_code is required")
-                result = provider.poll_device_authorization(
-                    device_code,
-                    interval_seconds=int(payload.get("interval") or pending.get("interval") or 5),
-                    timeout_seconds=int(payload.get("timeout") or 600),
-                    auth_mode=str(payload.get("mode") or pending.get("auth_mode") or "user").strip() or "user",
-                )
-                clear_pending_auth_state()
-                _print(
-                    {
-                        "ok": True,
-                        "status": "authorized",
-                        "message": f"Saved Feishu user auth into {USER_AUTH_FILE}",
-                        **result,
-                    }
-                )
-            else:
-                _print({"ok": False, "error": f"unsupported tool: {tool}"})
-                return 2
-            return 0
-        except FeishuError as exc:
-            _print({"ok": False, "error": str(exc)})
-            return 1
+            save_user_auth_state({
+                "user_access_token": user_access_token,
+                "user_refresh_token": user_refresh_token,
+                "user_token_expires_at": user_token_expires_at,
+                "user_refresh_expires_at": user_refresh_expires_at,
+                "user_open_id": user_open_id,
+            })
 
-    errors = validate_config(config)
-    if errors:
-        _print({"ok": False, "errors": errors})
-        return 2
+            _print({"ok": True, "message": "User auth imported successfully"})
+            return
 
-    client = init_provider(config)
+        # Validate config for resource operations
+        errors = validate_config(config)
+        if errors:
+            _print({"ok": False, "errors": errors})
+            return
 
-    drive = DriveService(client)
-    upload = UploadService(client)
-    docs = DocsService(client)
-    sheets = SheetsService(client)
-    slides = SlidesService(client)
-    bitable = BitableService(client)
+        client = init_provider(config)
 
-    result = None
+        # Drive operations
+        if args.tool == "drive.list":
+            drive = DriveService(client)
+            result = drive.list_folder(
+                payload.get("folder_token", "root"),
+                payload.get("page_token")
+            )
+            _print({"ok": True, "result": result})
+            return
 
-    if tool == "drive.list":
-        result = drive.list_folder(payload["folder_token"], payload.get("page_token"))
-    elif tool == "drive.create_folder":
-        result = drive.create_folder(payload["parent_token"], payload["name"], payload.get("request_id"))
-    elif tool == "drive.read":
-        result = drive.read_file_meta(payload["file_token"])
-    elif tool == "drive.update":
-        result = drive.update_file_meta(
-            payload["file_token"],
-            name=payload.get("name"),
-            folder_token=payload.get("folder_token"),
-        )
-    elif tool == "drive.delete":
-        result = drive.delete_node(
-            payload["token"],
-            recursive=bool(payload.get("recursive") or False),
-            request_id=payload.get("request_id"),
-            node_type=str(payload.get("node_type") or "file"),
-        )
-    elif tool == "drive.move":
-        result = drive.move_node(payload["token"], payload["target_folder_token"], payload.get("request_id"))
-    elif tool == "upload.bytes":
-        result = upload.upload_bytes(
-            payload["parent_token"],
-            payload["name"],
-            str(payload["content"]).encode("utf-8"),
-            mime=str(payload.get("mime") or "application/octet-stream"),
-        )
-    elif tool == "docs.create":
-        result = docs.create(payload["title"], payload.get("folder_token"))
-    elif tool == "docs.read":
-        result = docs.read(payload["doc_token"])
-    elif tool == "docs.read_blocks":
-        result = docs.list_blocks(payload["doc_token"])
-    elif tool == "docs.append":
-        result = docs.append_text(payload["doc_token"], payload["text"])
-    elif tool == "docs.append_heading":
-        result = docs.append_heading(
-            payload["doc_token"],
-            payload["text"],
-            level=int(payload.get("level") or 1),
-            index=payload.get("index"),
-        )
-    elif tool == "docs.append_bullet":
-        result = docs.append_bullet(payload["doc_token"], payload["text"], index=payload.get("index"))
-    elif tool == "docs.append_styled":
-        result = docs.append_styled_text(
-            payload["doc_token"],
-            payload["text"],
-            bold=bool(payload.get("bold") or False),
-            italic=bool(payload.get("italic") or False),
-            underline=bool(payload.get("underline") or False),
-            index=payload.get("index"),
-        )
-    elif tool == "docs.update":
-        result = docs.update_text(payload["doc_token"], payload["text"], block_id=payload.get("block_id"))
-    elif tool == "docs.delete":
-        result = docs.delete(payload["doc_token"])
-    elif tool == "sheets.create":
-        result = sheets.create(payload["title"], payload.get("folder_token"))
-    elif tool == "sheets.read_range":
-        result = sheets.read_range(payload["sheet_token"], payload["range"])
-    elif tool == "sheets.write":
-        result = sheets.write_range(payload["sheet_token"], payload["range"], payload["values"])
-    elif tool == "sheets.append_rows":
-        result = sheets.append_rows(payload["sheet_token"], payload["range"], payload["values"])
-    elif tool == "sheets.delete_range":
-        result = sheets.delete_range(payload["sheet_token"], payload["range"])
-    elif tool == "slides.append":
-        result = slides.append_slide(payload["slides_token"], payload["title"])
-    elif tool == "bitable.list_tables":
-        result = bitable.list_tables(payload["app_token"])
-    elif tool == "bitable.list_fields":
-        result = bitable.list_fields(payload["app_token"], payload["table_id"])
-    elif tool == "bitable.create_table":
-        result = bitable.create_table(payload["app_token"], payload["name"])
-    elif tool == "bitable.read_records":
-        result = bitable.read_records(payload["app_token"], payload["table_id"], view_id=payload.get("view_id"))
-    elif tool == "bitable.create_record":
-        result = bitable.create_record(payload["app_token"], payload["table_id"], payload["fields"])
-    elif tool == "bitable.update_record":
-        result = bitable.update_record(payload["app_token"], payload["table_id"], payload["record_id"], payload["fields"])
-    elif tool == "bitable.delete_record":
-        result = bitable.delete_record(payload["app_token"], payload["table_id"], payload["record_id"])
-    else:
-        _print({"ok": False, "error": f"unsupported tool: {tool}"})
-        return 2
+        if args.tool == "drive.create_folder":
+            drive = DriveService(client)
+            result = drive.create_folder(
+                payload["parent_token"],
+                payload["name"],
+                payload.get("request_id")
+            )
+            _print({"ok": True, "result": result})
+            return
 
-    _print({"ok": True, "tool": tool, "result": result})
-    return 0
+        if args.tool == "drive.read":
+            drive = DriveService(client)
+            result = drive.read_file_meta(payload["file_token"])
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "drive.update":
+            drive = DriveService(client)
+            result = drive.update_file_meta(
+                payload["file_token"],
+                name=payload.get("name"),
+                folder_token=payload.get("folder_token")
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "drive.move":
+            drive = DriveService(client)
+            result = drive.move_node(
+                payload["file_token"],
+                payload["target_folder_token"],
+                payload.get("request_id")
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "drive.delete":
+            drive = DriveService(client)
+            result = drive.delete_node(
+                payload["file_token"],
+                recursive=payload.get("recursive", False),
+                request_id=payload.get("request_id")
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        # Upload operations
+        if args.tool == "upload.bytes":
+            upload = UploadService(client)
+            content = payload["content"]
+            if isinstance(content, str):
+                content = content.encode("utf-8")
+            result = upload.upload_bytes(
+                payload["parent_token"],
+                payload["name"],
+                content,
+                mime=payload.get("mime")
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        # Docs operations
+        if args.tool == "docs.create":
+            docs = DocsService(client)
+            result = docs.create(
+                payload["title"],
+                folder_token=payload.get("folder_token")
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "docs.read":
+            docs = DocsService(client)
+            result = docs.read(payload["doc_token"])
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "docs.read_blocks":
+            docs = DocsService(client)
+            result = docs.list_blocks(payload["doc_token"])
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "docs.append":
+            docs = DocsService(client)
+            result = docs.append_text(
+                payload["doc_token"],
+                payload["text"]
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "docs.append_heading":
+            docs = DocsService(client)
+            result = docs.append_heading(
+                payload["doc_token"],
+                payload["text"],
+                level=payload.get("level", 1),
+                index=payload.get("index")
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "docs.append_bullet":
+            docs = DocsService(client)
+            result = docs.append_bullet(
+                payload["doc_token"],
+                payload["text"],
+                index=payload.get("index")
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "docs.append_styled":
+            docs = DocsService(client)
+            result = docs.append_styled_text(
+                payload["doc_token"],
+                payload["text"],
+                bold=payload.get("bold", False),
+                italic=payload.get("italic", False),
+                underline=payload.get("underline", False),
+                index=payload.get("index")
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "docs.update":
+            docs = DocsService(client)
+            result = docs.update_text(
+                payload["doc_token"],
+                payload["text"],
+                block_id=payload.get("block_id")
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "docs.delete":
+            docs = DocsService(client)
+            result = docs.delete(payload["doc_token"])
+            _print({"ok": True, "result": result})
+            return
+
+        # Sheets operations
+        if args.tool == "sheets.create":
+            sheets = SheetsService(client)
+            result = sheets.create(
+                payload["title"],
+                folder_token=payload.get("folder_token")
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "sheets.read_range":
+            sheets = SheetsService(client)
+            result = sheets.read_range(
+                payload["sheet_token"],
+                payload["range"]
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "sheets.write":
+            sheets = SheetsService(client)
+            result = sheets.write_range(
+                payload["sheet_token"],
+                payload["range"],
+                payload["values"]
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "sheets.append_rows":
+            sheets = SheetsService(client)
+            result = sheets.append_rows(
+                payload["sheet_token"],
+                payload["range"],
+                payload["values"]
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "sheets.delete_range":
+            sheets = SheetsService(client)
+            result = sheets.delete_range(
+                payload["sheet_token"],
+                payload["range"]
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        # Bitable operations
+        if args.tool == "bitable.list_tables":
+            bitable = BitableService(client)
+            result = bitable.list_tables(payload["app_token"])
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "bitable.list_fields":
+            bitable = BitableService(client)
+            result = bitable.list_fields(
+                payload["app_token"],
+                payload["table_id"]
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "bitable.create_table":
+            bitable = BitableService(client)
+            result = bitable.create_table(
+                payload["app_token"],
+                payload["name"]
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "bitable.read_records":
+            bitable = BitableService(client)
+            result = bitable.read_records(
+                payload["app_token"],
+                payload["table_id"],
+                page_token=payload.get("page_token")
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "bitable.create_record":
+            bitable = BitableService(client)
+            result = bitable.create_record(
+                payload["app_token"],
+                payload["table_id"],
+                payload["fields"]
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "bitable.update_record":
+            bitable = BitableService(client)
+            result = bitable.update_record(
+                payload["app_token"],
+                payload["table_id"],
+                payload["record_id"],
+                payload["fields"]
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        if args.tool == "bitable.delete_record":
+            bitable = BitableService(client)
+            result = bitable.delete_record(
+                payload["app_token"],
+                payload["table_id"],
+                payload["record_id"]
+            )
+            _print({"ok": True, "result": result})
+            return
+
+        _print({"ok": False, "error": f"Unknown tool: {args.tool}"})
+
+    except Exception as e:
+        _print({"ok": False, "error": str(e)})
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()
