@@ -118,12 +118,13 @@ Not yet implemented:
 The intended experience is:
 1. user installs the supplement
 2. config is inherited from cc-connect automatically
-3. user runs `feishu-auth-setup` or `feishu auth start`
-4. the supplement generates the authorization link
-5. after user authorizes, the supplement completes `auth.poll`
-6. Feishu resource features become available
+3. user runs `feishu-auth-setup`
+4. the script generates the authorization link and displays it
+5. user opens the link in browser and authorizes
+6. the script automatically completes authorization
+7. Feishu resource features become available
 
-This repo already provides the auth bootstrap, pending-auth persistence, CLI/MCP entrypoints needed for that flow.
+This repo provides the auth bootstrap, pending-auth persistence, and CLI/MCP entrypoints needed for that flow.
 
 ## 5. Current package positioning
 

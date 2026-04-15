@@ -10,11 +10,7 @@ cc-connect 的飞书补丁包，提供继承配置、CLI 和 MCP 入口、单链
 - 提供两个入口：
   - `feishu` CLI 命令行工具
   - `cc-feishu-mcp` MCP 服务器
-- 支持用户授权：
-  - `auth status` 查看授权状态
-  - `auth start` 生成授权链接
-  - `auth poll` 完成授权轮询
-  - `auth import` 导入已有授权
+- 支持用户授权（由 `feishu-auth-setup` 自动处理）
 - 提供以下功能的实用操作：
   - 云盘 (Drive)
   - 上传 (Upload)
@@ -42,77 +38,22 @@ feishu-auth-setup
 
 设置完成后，重启 Claude Code，您就可以在对话中自然使用飞书功能。
 
-```bash
-```
+## 高级用户
 
-## 配置说明
-
-**本补丁默认继承 cc-connect 官方配置，无需额外配置文件。**
-
-配置读取顺序：
-
-1. 环境变量
-2. `CC_CONNECT_CONFIG_PATH` 指向的配置文件
-3. `~/.cc-connect/config.toml`
-
-期望的配置格式：
-
-```toml
-[[projects]]
-name = "claudecode"
-
-[[projects.platforms]]
-type = "feishu"
-[projects.platforms.options]
-app_id = "..."
-app_secret = "..."
-tenant_access_token = "..."
-base_url = "https://open.feishu.cn"
-```
-
-如果你已经配置了 cc-connect 的飞书集成，本补丁会自动继承这些配置。
-
-## 快速开始
-
-### 1. 检查授权状态
+如果需要手动控制，可以直接使用 CLI 命令：
 
 ```bash
-python -m cc_feishu.cli auth status
-```
+# 检查授权状态
+feishu auth status
 
-### 2. 发送授权链接到飞书
+# 列出云盘文件
+feishu drive list --folder root
 
-```bash
-python -m cc_feishu.cli auth start
-```
+# 创建文档
+feishu docs create --title "我的文档"
 
-参数说明：
-
-### 3. 完成授权轮询
-
-用户点击授权链接后，运行：
-
-```bash
-python -m cc_feishu.cli auth poll --timeout 600
-```
-
-### 4. 使用资源操作
-
-授权完成后，可以使用以下命令：
-
-```bash
-# 文档操作
-python -m cc_feishu.cli docs append --doc <文档token> --text "你好"
-python -m cc_feishu.cli docs read-blocks --doc <文档token>
-python -m cc_feishu.cli docs update --doc <文档token> --block <块ID> --text "更新的文本"
-
-# 云盘操作
-python -m cc_feishu.cli drive list --folder root
-python -m cc_feishu.cli drive create-folder --parent <父文件夹token> --name "新文件夹"
-
-# 多维表格操作
-python -m cc_feishu.cli bitable list-fields --app <应用token> --table <表格ID>
-python -m cc_feishu.cli bitable create-record --app <应用token> --table <表格ID> --fields '{"字段名":"值"}'
+# 追加文本到文档
+feishu docs append --doc <文档token> --text "你好"
 ```
 
 ## 功能概览

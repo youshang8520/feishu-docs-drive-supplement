@@ -10,11 +10,7 @@ A Feishu supplement for cc-connect with inherited configuration, CLI and MCP ent
 - Exposes two entrypoints:
   - `feishu` CLI
   - `cc-feishu-mcp` MCP server
-- Supports user authorization with:
-  - `auth status`
-  - `auth start`
-  - `auth poll`
-  - `auth import`
+- Supports user authorization (handled by `feishu-auth-setup`)
 - Provides practical support for:
   - Drive
   - Upload
@@ -42,59 +38,22 @@ This will:
 
 After setup, restart Claude Code and you can use Feishu features naturally in conversations.
 
-## Configuration
+## For advanced users
 
-**This supplement inherits cc-connect configuration by default; no manual setup required.**
-
-By default the package reuses Feishu configuration from cc-connect.
-
-Resolution order:
-
-1. Environment variables
-2. `CC_CONNECT_CONFIG_PATH`
-3. `~/.cc-connect/config.toml`
-
-Expected config shape:
-
-```toml
-[[projects]]
-name = "claudecode"
-
-[[projects.platforms]]
-type = "feishu"
-[projects.platforms.options]
-app_id = "..."
-app_secret = "..."
-tenant_access_token = "..."
-base_url = "https://open.feishu.cn"
-```
-
-## Quick start
-
-Check auth state:
+If you need manual control, you can use CLI commands directly:
 
 ```bash
-python -m cc_feishu.cli auth status
-```
+# Check authorization status
+feishu auth status
 
-Start authorization (generates link to open in browser):
+# List drive files
+feishu drive list --folder root
 
-```bash
-python -m cc_feishu.cli auth start
-```
+# Create a document
+feishu docs create --title "My Document"
 
-Complete polling after you authorize:
-
-```bash
-python -m cc_feishu.cli auth poll --timeout 600
-```
-
-Example resource operations after authorization:
-
-```bash
-python -m cc_feishu.cli docs append --doc <doc_token> --text "hello"
-python -m cc_feishu.cli drive list --folder root
-python -m cc_feishu.cli bitable list-fields --app <app_token> --table <table_id>
+# Append text to document
+feishu docs append --doc <doc_token> --text "hello"
 ```
 
 ## Capability summary

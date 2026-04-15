@@ -63,31 +63,19 @@ Notes:
 feishu --validate
 ```
 
-## 5. MCP Single-Link Authorization Integration
+## 5. Authorization
 
-For bot/plugin "send one link for user authorization" scenarios, use these commands:
-
-```bash
-cc-feishu-mcp auth.status --payload '{}'
-cc-feishu-mcp auth.start --payload '{}'
-cc-feishu-mcp auth.poll --payload '{"timeout":600}'
-```
-
-Recommended flow:
-
-1. Call `auth.start`
-2. Send the returned `verification_uri_complete` to the user
-3. After user clicks, call `auth.poll` in the background
-4. On success, user refresh token is automatically persisted
-
-Additional notes:
-
-- `auth.start` caches pending auth; repeated calls reuse existing link if not expired
-- To force refresh authorization link, call:
+Run the one-click setup:
 
 ```bash
-cc-feishu-mcp auth.start --payload '{"force": true}'
+feishu-auth-setup
 ```
+
+This will automatically:
+1. Generate authorization link
+2. Display the link for you to open in browser
+3. Wait for authorization completion
+4. Save tokens to `~/.cc-connect/feishu_user_auth.json`
 
 ## 6. Plugin Resource Call Recommendations
 

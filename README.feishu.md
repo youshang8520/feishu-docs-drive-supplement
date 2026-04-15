@@ -34,52 +34,29 @@ This will:
 
 After setup, restart Claude Code and you can use Feishu features naturally in conversations.
 
-## Configuration inheritance
+## For advanced users
 
-**This supplement inherits cc-connect configuration by default; no manual setup required.**
+If you need manual control, you can use CLI commands directly.
 
-Config is resolved in this order:
-
-1. Environment variables
-2. `CC_CONNECT_CONFIG_PATH`
-3. `~/.cc-connect/config.toml`
-
-Inherited Feishu keys are loaded from:
-
-```toml
-[[projects]]
-name = "claudecode"
-
-[[projects.platforms]]
-type = "feishu"
-[projects.platforms.options]
-app_id = "..."
-app_secret = "..."
-tenant_access_token = "..."
-# or token = "..."
-base_url = "https://open.feishu.cn"
-```
-
-## Authorization flows
-
-### CLI flow
+### CLI commands
 
 Check current state:
 
 ```bash
-python -m cc_feishu.cli auth status
+feishu auth status
 ```
 
-Start auth and print the verification link:
+List drive files:
 
 ```bash
-python -m cc_feishu.cli auth start
+feishu drive list --folder root
 ```
 
-Complete authorization after you approve:
+Create and edit documents:
 
 ```bash
-python -m cc_feishu.cli auth poll --timeout 600
+feishu docs create --title "My Document"
+feishu docs append --doc <doc_token> --text "hello"
 ```
 
 Successful user auth is persisted to `~/.cc-connect/feishu_user_auth.json`.

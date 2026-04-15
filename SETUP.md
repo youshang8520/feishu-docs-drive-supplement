@@ -49,7 +49,7 @@ FEISHU_APP_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ## Authorization
 
-### One-click setup (Recommended)
+Run the one-click setup:
 
 ```bash
 feishu-auth-setup
@@ -57,24 +57,12 @@ feishu-auth-setup
 
 This will:
 1. Check your configuration
-2. Set up MCP server (if using Claude Desktop)
-3. Install workspace skill
+2. Set up MCP plugin for Claude Code
+3. Set up project-level MCP configuration
 4. Guide you through authorization
+5. Save tokens automatically
 
-### Manual authorization
-
-```bash
-# Check status
-feishu auth status
-
-# Start authorization
-feishu auth start
-
-# Open the displayed link in your browser and authorize
-
-# Complete authorization
-feishu auth poll --timeout 600
-```
+After setup, restart Claude Code and you can use Feishu features naturally in conversations.
 
 ## Verify Installation
 
@@ -84,7 +72,6 @@ feishu auth status
 
 # Test MCP server
 cc-feishu-mcp auth.status --payload '{}'
-
 ```
 
 ## Claude Desktop Integration
@@ -153,12 +140,9 @@ Make sure either:
 
 1. Check your app credentials are correct
 2. Make sure your Feishu app has the required scopes
-3. Try force refresh:
-   ```bash
-   feishu auth start --force
-   ```
+3. Try running `feishu-auth-setup` again
 
-### MCP server not working in Claude Desktop
+### MCP server not working in Claude Code
 
 1. Verify the command works:
    ```bash
@@ -171,5 +155,5 @@ Make sure either:
 
 ## Next Steps
 
-- See `docs/mcp-configuration.md` for detailed MCP setup
-- See `docs/chat-integration-guide.md` for integration patterns
+- See `docs/feishu-capability-overview.md` for detailed capability matrix
+- See `docs/local-claude-import.md` for workspace integration notes
