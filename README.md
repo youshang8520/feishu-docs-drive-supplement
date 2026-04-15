@@ -2,15 +2,14 @@
 
 [中文文档](README.zh-CN.md) | English
 
-A Feishu supplement for cc-connect with inherited configuration, CLI/MCP/chat entrypoints, a single-link user-authorization flow, and practical operations for Drive, Upload, Docs, Sheets, and Bitable.
+A Feishu supplement for cc-connect with inherited configuration, CLI and MCP entrypoints, a single-link user-authorization flow, and practical operations for Drive, Upload, Docs, Sheets, and Bitable.
 
 ## What this project provides
 
 - Inherits Feishu app configuration from cc-connect.
-- Exposes three entrypoints:
+- Exposes two entrypoints:
   - `feishu` CLI
   - `cc-feishu-mcp` MCP server
-  - `cc-feishu-chat` fixed-command router
 - Supports user authorization with:
   - `auth status`
   - `auth start`
@@ -26,8 +25,22 @@ A Feishu supplement for cc-connect with inherited configuration, CLI/MCP/chat en
 ## Install
 
 ```bash
-python -m pip install -e .
+pip install git+https://github.com/youshang8520/feishu-docs-drive-supplement.git
 ```
+
+## One-click setup
+
+```bash
+feishu-auth-setup
+```
+
+This will:
+1. Configure MCP plugin for Claude Code
+2. Set up project-level MCP configuration
+3. Guide you through authorization
+4. Save tokens automatically
+
+After setup, restart Claude Code and you can use Feishu features naturally in conversations.
 
 ## Configuration
 
@@ -97,22 +110,16 @@ python -m cc_feishu.cli bitable list-fields --app <app_token> --table <table_id>
 ### Current boundaries
 - Drive rename is not yet confirmed as a stable supported API shape.
 - `docs.update` performs precise block-text updates when `block_id` is provided; without `block_id`, it falls back to append behavior.
-- The project provides a fixed command router and direct auth-link delivery helper, but it is not a full long-running bot or webhook runtime.
 
 ## Documentation
 
 - `README.feishu.md` — package overview and command surface
 - `docs/feishu-capability-overview.md` — detailed capability matrix and positioning
-- `docs/chat-integration-guide.md` — how to connect `/feishu ...` style commands to this package
 - `docs/local-claude-import.md` — workspace integration notes
 - `CHANGELOG.md` — release history
-
-## Packaging artifacts
-
-Prepared release artifacts are available in `github_publish/`.
 
 ## Testing
 
 ```bash
-pytest tests/test_validate.py tests/test_chat_router.py tests/test_mcp_server.py
+pytest tests/test_validate.py tests/test_mcp_server.py
 ```

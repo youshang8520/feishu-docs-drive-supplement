@@ -1,11 +1,11 @@
 # Feishu Docs & Drive Supplement
 
-A Python supplement package for cc-connect that adds Feishu Docs, Drive, Sheets, and Bitable capabilities with inherited configuration, CLI tooling, MCP tools, user-authorization helpers, and a thin chat-command compatibility layer.
+A Python supplement package for cc-connect that adds Feishu Docs, Drive, Sheets, and Bitable capabilities with inherited configuration, CLI tooling, MCP tools, and user-authorization helpers.
 
 ## What this package does
 
 - Inherits Feishu app configuration from an existing cc-connect config.
-- Adds CLI, MCP, and chat-router entrypoints for Feishu resource operations.
+- Adds CLI and MCP entrypoints for Feishu resource operations.
 - Supports a single-link user-authorization flow.
 - Provides practical operations for:
   - Drive
@@ -17,8 +17,22 @@ A Python supplement package for cc-connect that adds Feishu Docs, Drive, Sheets,
 ## Install
 
 ```bash
-python -m pip install -e .
+pip install git+https://github.com/youshang8520/feishu-docs-drive-supplement.git
 ```
+
+## One-click setup
+
+```bash
+feishu-auth-setup
+```
+
+This will:
+1. Configure MCP plugin for Claude Code
+2. Set up project-level MCP configuration
+3. Guide you through authorization
+4. Save tokens automatically
+
+After setup, restart Claude Code and you can use Feishu features naturally in conversations.
 
 ## Configuration inheritance
 
@@ -70,38 +84,6 @@ python -m cc_feishu.cli auth poll --timeout 600
 
 Successful user auth is persisted to `~/.cc-connect/feishu_user_auth.json`.
 
-### Chat-router flow
-
-For a higher-level chat or command host, the intended flow is:
-
-```bash
-cc-feishu-chat "/feishu auth"
-cc-feishu-chat "/feishu auth poll --timeout 600"
-```
-
-Behavior:
-- `cc-feishu-chat "/feishu auth"` returns structured JSON including `verification_uri_complete`
-- pending auth is cached locally and can be reused
-- `poll` can resume without the caller resending `device_code`
-
-## Slash-command compatibility path
-
-This repository includes a thin workspace-skill wrapper at:
-- `skills/feishu/SKILL.md`
-
-and a helper script:
-- `scripts/install_feishu_skill.py`
-
-The wrapper is designed so a host that supports workspace skill discovery can expose `/feishu ...` without modifying official cc-connect source code.
-
-The wrapper delegates to:
-
-```bash
-cc-feishu-chat "/feishu $ARGUMENTS"
-```
-
-This is the preferred compatibility path because it layers on top of the official runtime instead of patching official core code.
-
 ## Current capability surface
 
 ### CLI entrypoints
@@ -152,16 +134,8 @@ This is the preferred compatibility path because it layers on top of the officia
 - `bitable.update_record`
 - `bitable.delete_record`
 
-### Chat router
-- `cc-feishu-chat`
-  - parses fixed `/feishu ...` style commands
-  - returns structured JSON for an outer chat layer
-  - supports auth-link generation
-  - provides a compatibility layer without modifying official cc-connect
-
 ## Current boundaries
 
 - `docs.update` supports precise block-text updates when a `block_id` is provided; without `block_id`, it falls back to append semantics.
 - Docs support append helpers for headings, bullets, and simple styled text runs, but do not yet expose a full rich table/image abstraction layer.
 - Drive rename is not yet confirmed as a stable supported API shape.
-- The package includes a fixed command router, but it is not a standalone long-running bot server or multi-user session manager.

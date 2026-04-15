@@ -16,7 +16,6 @@ It is designed to:
 - inherit Feishu config from cc-connect
 - expose a CLI surface for direct/manual use
 - expose an MCP surface for higher-level plugins or bots
-- expose a fixed command router for `/feishu ...` style integrations
 
 ## 2. Authorization model
 
@@ -119,19 +118,19 @@ Not yet implemented:
 The intended experience is:
 1. user installs the supplement
 2. config is inherited from cc-connect automatically
-3. user runs a fixed command such as `/feishu auth` or `feishu auth start`
+3. user runs `feishu-auth-setup` or `feishu auth start`
 4. the supplement generates the authorization link
 5. after user authorizes, the supplement completes `auth.poll`
 6. Feishu resource features become available
 
-This repo already provides the auth bootstrap, pending-auth persistence, CLI/MCP entrypoints, and fixed command router needed for that flow.
+This repo already provides the auth bootstrap, pending-auth persistence, CLI/MCP entrypoints needed for that flow.
 
 ## 5. Current package positioning
 
 The package should be described as:
 - a reusable Feishu supplement for cc-connect
 - with inherited auth/config
-- with fixed command routing
+- with CLI and MCP entrypoints
 - with strong Drive / Upload / Sheets / Bitable support
 - with basic-to-mid-level Docs support
 - not a full standalone hosted bot runtime

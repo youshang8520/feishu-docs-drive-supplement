@@ -85,8 +85,6 @@ feishu auth status
 # Test MCP server
 cc-feishu-mcp auth.status --payload '{}'
 
-# Test chat router
-cc-feishu-chat "/feishu auth"
 ```
 
 ## Claude Desktop Integration
@@ -124,15 +122,10 @@ Claude will automatically use the Feishu MCP tools.
 
 ## Workspace Skill (cc-connect)
 
-If you're using cc-connect with skill support, the `/feishu` command will be available after installation:
 
 ```
-/feishu auth
-/feishu drive list --folder root
-/feishu docs read-blocks --doc <doc_token>
 ```
 
-The skill is automatically installed at `skills/feishu/SKILL.md` by `feishu-auth-setup`.
 
 ## Troubleshooting
 
@@ -178,6 +171,5 @@ Make sure either:
 
 ## Next Steps
 
-- See `docs/feishu-capability-overview.md` for full capability list
 - See `docs/mcp-configuration.md` for detailed MCP setup
 - See `docs/chat-integration-guide.md` for integration patterns
