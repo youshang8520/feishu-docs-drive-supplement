@@ -38,9 +38,14 @@ This will:
 
 After setup, restart Claude Code and you can use Feishu features naturally in conversations.
 
-## For advanced users
+**Examples:**
+- "List my Feishu drive files"
+- "Create a document called Meeting Notes"
+- "Read the document at <url>"
 
-If you need manual control, you can use CLI commands directly:
+## For advanced users (CLI commands)
+
+If you need manual control via terminal/command line, you can use CLI commands directly:
 
 ```bash
 # Check authorization status
@@ -55,6 +60,8 @@ feishu docs create --title "My Document"
 # Append text to document
 feishu docs append --doc <doc_token> --text "hello"
 ```
+
+**Note:** These are terminal commands for developers and automation. Regular users should use Claude Code conversations instead.
 
 ## Capability summary
 

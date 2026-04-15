@@ -34,30 +34,27 @@ This will:
 
 After setup, restart Claude Code and you can use Feishu features naturally in conversations.
 
-## For advanced users
+**Examples:**
+- "List my Feishu drive files"
+- "Create a document called Meeting Notes"
 
-If you need manual control, you can use CLI commands directly.
+## For advanced users (CLI commands)
 
-### CLI commands
-
-Check current state:
+If you need manual control via terminal/command line:
 
 ```bash
+# Check current state
 feishu auth status
-```
 
-List drive files:
-
-```bash
+# List drive files
 feishu drive list --folder root
-```
 
-Create and edit documents:
-
-```bash
+# Create and edit documents
 feishu docs create --title "My Document"
 feishu docs append --doc <doc_token> --text "hello"
 ```
+
+**Note:** These are terminal commands for developers. Regular users should use Claude Code conversations.
 
 Successful user auth is persisted to `~/.cc-connect/feishu_user_auth.json`.
 
