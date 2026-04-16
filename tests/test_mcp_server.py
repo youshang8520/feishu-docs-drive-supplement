@@ -265,28 +265,54 @@ def test_mcp_drive_update_routes_to_service(monkeypatch, tmp_path, capsys):
     assert data["result"]["file_token"] == "file_tok"
 
 
-def test_mcp_docs_update_routes_to_service(monkeypatch, tmp_path, capsys):
+def test_mcp_docs_append_code_routes_to_service(monkeypatch, tmp_path, capsys):
     cfg_file = tmp_path / "config.toml"
     _write_cfg(cfg_file)
     monkeypatch.setenv("CC_CONNECT_CONFIG_PATH", str(cfg_file))
 
-    def _fake_update(self, doc_token, text, block_id=None):
+    def _fake_append_code(self, doc_token, text, *, language=49, wrap=True, index=None):
         assert doc_token == "doc_tok"
-        assert text == "updated text"
-        assert block_id == "blk_tok"
-        return {"ok": True, "doc_token": doc_token, "text": text, "block_id": block_id}
+        assert text == "print('hi')"
+        assert language == 7
+        assert wrap is False
+        assert index == 2
+        return {"ok": True, "doc_token": doc_token, "text": text, "language": language, "wrap": wrap, "index": index}
 
-    monkeypatch.setattr("cc_feishu.mcp.server.DocsService.update_text", _fake_update)
+    monkeypatch.setattr("cc_feishu.mcp.server.DocsService.append_code_block", _fake_append_code)
 
-    payload = json.dumps({"doc_token": "doc_tok", "text": "updated text", "block_id": "blk_tok"})
-    exit_code = main(["docs.update", "--payload", payload])
+    payload = json.dumps({"doc_token": "doc_tok", "text": "print('hi')", "language": 7, "wrap": False, "index": 2})
+    exit_code = main(["docs.append_code", "--payload", payload])
     out = capsys.readouterr().out
 
     assert exit_code == 0
     data = json.loads(out)
-    assert data["tool"] == "docs.update"
-    assert data["result"]["doc_token"] == "doc_tok"
-    assert data["result"]["block_id"] == "blk_tok"
+    assert data["tool"] == "docs.append_code"
+    assert data["result"]["language"] == 7
+    assert data["result"]["wrap"] is False
+
+
+def test_mcp_docs_append_rich_text_routes_to_service(monkeypatch, tmp_path, capsys):
+    cfg_file = tmp_path / "config.toml"
+    _write_cfg(cfg_file)
+    monkeypatch.setenv("CC_CONNECT_CONFIG_PATH", str(cfg_file))
+
+    def _fake_append_rich_text(self, doc_token, blocks, *, index=None):
+        assert doc_token == "doc_tok"
+        assert blocks == [{"type": "heading", "text": "Title"}, {"type": "code", "text": "x = 1"}]
+        assert index == 1
+        return {"ok": True, "doc_token": doc_token, "blocks": blocks, "index": index}
+
+    monkeypatch.setattr("cc_feishu.mcp.server.DocsService.append_rich_text", _fake_append_rich_text)
+
+    payload = json.dumps({"doc_token": "doc_tok", "blocks": [{"type": "heading", "text": "Title"}, {"type": "code", "text": "x = 1"}], "index": 1})
+    exit_code = main(["docs.append_rich_text", "--payload", payload])
+    out = capsys.readouterr().out
+
+    assert exit_code == 0
+    data = json.loads(out)
+    assert data["tool"] == "docs.append_rich_text"
+    assert data["result"]["index"] == 1
+    assert data["result"]["blocks"][1]["type"] == "code"
 
 
 def test_mcp_docs_read_blocks_routes_to_service(monkeypatch, tmp_path, capsys):

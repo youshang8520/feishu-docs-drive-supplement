@@ -23,6 +23,8 @@
 - Python 3.10 compatibility fixed with conditional `tomli` dependency
 - Root ignore rules added for build artifacts and caches
 - Release docs updated to match current MCP registration and direct-content behavior
+- Docs write flow now supports `docs.append_code` and `docs.append_rich_text` across service, CLI, chat router, MCP server, manifest, and tool schemas
+- Rich Feishu document output now defaults toward structured rich text, with command/config examples written as code blocks and batched appends used to reduce block-order corruption
 
 ### Known limitations
 - Drive rename is not yet confirmed as a stable supported API shape

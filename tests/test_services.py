@@ -100,6 +100,7 @@ def test_docs_update_block_uses_patch_when_block_id_is_given():
             ]
         }
     }
+    assert res["auth_preference"] == "user"
 
 
 def test_docs_list_blocks_uses_document_blocks_endpoint():
@@ -215,6 +216,141 @@ def test_docs_append_styled_text_uses_text_element_style():
             }
         ]
     }
+    assert res["auth_preference"] == "user"
+
+
+def test_docs_append_code_block_uses_code_payload():
+    class _Client:
+        class _Config:
+            dry_run = True
+
+        def __init__(self):
+            self._config = self._Config()
+
+        def post(self, path: str, json_data=None, *, auth_preference="auto"):
+            return {"path": path, "json": json_data, "auth_preference": auth_preference}
+
+    svc = DocsService(_Client())
+    res = svc.append_code_block("doc_tok", "print('hi')", language=42, wrap=False, index=1)
+
+    assert res["json"] == {
+        "children": [
+            {
+                "block_type": 14,
+                "code": {
+                    "elements": [
+                        {
+                            "text_run": {
+                                "content": "print('hi')",
+                            }
+                        }
+                    ],
+                    "style": {
+                        "language": 42,
+                        "wrap": False,
+                    },
+                },
+            }
+        ],
+        "index": 1,
+    }
+    assert res["auth_preference"] == "user"
+
+
+def test_docs_append_rich_text_batches_multiple_block_types():
+    class _Client:
+        class _Config:
+            dry_run = True
+
+        def __init__(self):
+            self._config = self._Config()
+
+        def post(self, path: str, json_data=None, *, auth_preference="auto"):
+            return {"path": path, "json": json_data, "auth_preference": auth_preference}
+
+    svc = DocsService(_Client())
+    res = svc.append_rich_text(
+        "doc_tok",
+        [
+            {"type": "heading", "text": "Title", "level": 2},
+            {"type": "text", "text": "Body", "bold": True},
+            {"type": "bullet", "text": "Point"},
+            {"type": "code", "text": "x = 1", "language": 7, "wrap": False},
+        ],
+    )
+
+    assert res["json"] == {
+        "children": [
+            {
+                "block_type": 4,
+                "heading2": {
+                    "elements": [
+                        {
+                            "text_run": {
+                                "content": "Title",
+                            }
+                        }
+                    ]
+                },
+            },
+            {
+                "block_type": 2,
+                "text": {
+                    "elements": [
+                        {
+                            "text_run": {
+                                "content": "Body",
+                                "text_element_style": {
+                                    "bold": True,
+                                    "italic": False,
+                                    "underline": False,
+                                },
+                            }
+                        }
+                    ]
+                },
+            },
+            {
+                "block_type": 12,
+                "bullet": {
+                    "elements": [
+                        {
+                            "text_run": {
+                                "content": "Point",
+                            }
+                        }
+                    ]
+                },
+            },
+            {
+                "block_type": 14,
+                "code": {
+                    "elements": [
+                        {
+                            "text_run": {
+                                "content": "x = 1",
+                            }
+                        }
+                    ],
+                    "style": {
+                        "language": 7,
+                        "wrap": False,
+                    },
+                },
+            },
+        ]
+    }
+    assert res["auth_preference"] == "user"
+
+
+def test_docs_append_rich_text_rejects_unsupported_block_type():
+    svc = DocsService(_client())
+
+    try:
+        svc.append_rich_text("doc_tok", [{"type": "table", "text": "nope"}])
+        assert False, "expected ValidationError"
+    except ValidationError as exc:
+        assert "unsupported rich text block type" in str(exc)
 
 
 def test_sheets_write_dry_run():
@@ -433,78 +569,93 @@ def test_upload_service_prefers_user_auth():
 
 
 def test_mcp_tools_register_auth_commands():
-    assert TOOLS["auth.status"] == {"required": [], "optional": []}
-    assert TOOLS["auth.start"] == {"required": [], "optional": ["mode", "scope", "force"]}
-    assert TOOLS["auth.poll"] == {
-        "required": ["device_code"],
-        "optional": ["interval", "timeout", "mode"],
+    tool_specs = {}
+    for tool in TOOLS:
+        schema = tool["inputSchema"]
+        props = list((schema.get("properties") or {}).keys())
+        required = list(schema.get("required") or [])
+        optional = [name for name in props if name not in required]
+        tool_specs[tool["name"]] = {"required": required, "optional": optional}
+
+    assert tool_specs["auth.status"] == {"required": [], "optional": []}
+    assert tool_specs["auth.start"] == {"required": [], "optional": ["scope", "mode", "force"]}
+    assert tool_specs["auth.poll"] == {
+        "required": [],
+        "optional": ["device_code", "timeout", "interval", "mode"],
     }
-    assert TOOLS["auth.import"] == {
+    assert tool_specs["auth.import"] == {
         "required": [],
         "optional": [
-            "mode",
-            "access_token",
-            "refresh_token",
-            "expires_at",
-            "refresh_expires_at",
-            "open_id",
+            "user_access_token",
+            "user_refresh_token",
+            "user_token_expires_at",
+            "user_refresh_expires_at",
+            "user_open_id",
         ],
     }
-    assert TOOLS["drive.read"] == {"required": ["file_token"], "optional": []}
-    assert TOOLS["drive.update"] == {"required": ["file_token"], "optional": ["name", "folder_token"]}
-    assert TOOLS["drive.delete"] == {
-        "required": ["token"],
-        "optional": ["recursive", "request_id", "node_type"],
+    assert tool_specs["drive.read"] == {"required": ["file_token"], "optional": []}
+    assert tool_specs["drive.update"] == {"required": ["file_token"], "optional": ["name", "folder_token"]}
+    assert tool_specs["drive.delete"] == {
+        "required": ["file_token"],
+        "optional": ["recursive", "request_id"],
     }
-    assert TOOLS["drive.move"] == {
-        "required": ["token", "target_folder_token"],
+    assert tool_specs["drive.move"] == {
+        "required": ["file_token", "target_folder_token"],
         "optional": ["request_id"],
     }
-    assert TOOLS["upload.bytes"] == {
+    assert tool_specs["upload.bytes"] == {
         "required": ["parent_token", "name", "content"],
         "optional": ["mime"],
     }
-    assert TOOLS["docs.read"] == {"required": ["doc_token"], "optional": []}
-    assert TOOLS["docs.read_blocks"] == {"required": ["doc_token"], "optional": []}
-    assert TOOLS["docs.append_heading"] == {
+    assert tool_specs["docs.read"] == {"required": ["doc_token"], "optional": []}
+    assert tool_specs["docs.read_blocks"] == {"required": ["doc_token"], "optional": []}
+    assert tool_specs["docs.append_heading"] == {
         "required": ["doc_token", "text"],
         "optional": ["level", "index"],
     }
-    assert TOOLS["docs.append_bullet"] == {
+    assert tool_specs["docs.append_bullet"] == {
         "required": ["doc_token", "text"],
         "optional": ["index"],
     }
-    assert TOOLS["docs.append_styled"] == {
+    assert tool_specs["docs.append_styled"] == {
         "required": ["doc_token", "text"],
         "optional": ["bold", "italic", "underline", "index"],
     }
-    assert TOOLS["docs.update"] == {
+    assert tool_specs["docs.append_code"] == {
+        "required": ["doc_token", "text"],
+        "optional": ["language", "wrap", "index"],
+    }
+    assert tool_specs["docs.append_rich_text"] == {
+        "required": ["doc_token", "blocks"],
+        "optional": ["index"],
+    }
+    assert tool_specs["docs.update"] == {
         "required": ["doc_token", "text"],
         "optional": ["block_id"],
     }
-    assert TOOLS["docs.delete"] == {"required": ["doc_token"], "optional": []}
-    assert TOOLS["sheets.create"] == {"required": ["title"], "optional": ["folder_token"]}
-    assert TOOLS["sheets.read_range"] == {"required": ["sheet_token", "range"], "optional": []}
-    assert TOOLS["sheets.append_rows"] == {
+    assert tool_specs["docs.delete"] == {"required": ["doc_token"], "optional": []}
+    assert tool_specs["sheets.create"] == {"required": ["title"], "optional": ["folder_token"]}
+    assert tool_specs["sheets.read_range"] == {"required": ["sheet_token", "range"], "optional": []}
+    assert tool_specs["sheets.append_rows"] == {
         "required": ["sheet_token", "range", "values"],
         "optional": [],
     }
-    assert TOOLS["sheets.delete_range"] == {"required": ["sheet_token", "range"], "optional": []}
-    assert TOOLS["bitable.list_tables"] == {"required": ["app_token"], "optional": []}
-    assert TOOLS["bitable.list_fields"] == {
+    assert tool_specs["sheets.delete_range"] == {"required": ["sheet_token", "range"], "optional": []}
+    assert tool_specs["bitable.list_tables"] == {"required": ["app_token"], "optional": []}
+    assert tool_specs["bitable.list_fields"] == {
         "required": ["app_token", "table_id"],
         "optional": [],
     }
-    assert TOOLS["bitable.create_table"] == {"required": ["app_token", "name"], "optional": []}
-    assert TOOLS["bitable.read_records"] == {
+    assert tool_specs["bitable.create_table"] == {"required": ["app_token", "name"], "optional": []}
+    assert tool_specs["bitable.read_records"] == {
         "required": ["app_token", "table_id"],
-        "optional": ["view_id"],
+        "optional": ["page_token"],
     }
-    assert TOOLS["bitable.update_record"] == {
+    assert tool_specs["bitable.update_record"] == {
         "required": ["app_token", "table_id", "record_id", "fields"],
         "optional": [],
     }
-    assert TOOLS["bitable.delete_record"] == {
+    assert tool_specs["bitable.delete_record"] == {
         "required": ["app_token", "table_id", "record_id"],
         "optional": [],
     }

@@ -335,6 +335,28 @@ def main(argv: list[str] | None = None) -> int:
             _print({"ok": True, "tool": args.tool, "result": result})
             return 0
 
+        if args.tool == "docs.append_code":
+            docs = DocsService(client)
+            result = docs.append_code_block(
+                payload["doc_token"],
+                payload["text"],
+                language=payload.get("language", 49),
+                wrap=payload.get("wrap", True),
+                index=payload.get("index")
+            )
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
+
+        if args.tool == "docs.append_rich_text":
+            docs = DocsService(client)
+            result = docs.append_rich_text(
+                payload["doc_token"],
+                payload["blocks"],
+                index=payload.get("index")
+            )
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
+
         if args.tool == "docs.update":
             docs = DocsService(client)
             result = docs.update_text(

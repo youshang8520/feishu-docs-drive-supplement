@@ -103,6 +103,8 @@ feishu bitable read-content --app <app_token> --table <table_id>
 - 追加标题
 - 追加列表项
 - 追加样式文本
+- 追加代码块（`append-code`）
+- 批量追加富文本块（`append-rich-text`）
 - 删除文档
 - 更新指定块的文本（需要提供 `block_id`）
 

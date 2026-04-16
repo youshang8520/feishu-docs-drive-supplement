@@ -24,6 +24,8 @@
     "docs.append_heading",
     "docs.append_bullet",
     "docs.append_styled",
+    "docs.append_code",
+    "docs.append_rich_text",
     "docs.update",
     "docs.delete",
     "sheets.create",

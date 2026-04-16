@@ -83,7 +83,7 @@ feishu bitable read-content --app <app_token> --table <table_id>
 ### Included
 - Drive: list / read-folder / create-folder / read / move / delete
 - Upload: file / bytes upload
-- Docs: create / read / read-content / read-blocks / append / append-heading / append-bullet / append-styled / update / delete
+- Docs: create / read / read-content / read-blocks / append / append-heading / append-bullet / append-styled / append-code / append-rich-text / update / delete
 - Sheets: create / read-range / read-content / write / append-rows / delete-range
 - Bitable: list-tables / list-fields / create-table / read-records / read-content / create-record / update-record / delete-record
 - Auth: inherited config + single-link auth bootstrap + pending-auth reuse
@@ -91,6 +91,7 @@ feishu bitable read-content --app <app_token> --table <table_id>
 ### Current boundaries
 - Drive rename is not yet confirmed as a stable supported API shape.
 - `docs.update` performs precise block-text updates when `block_id` is provided; without `block_id`, it falls back to append behavior.
+- Rich Feishu document generation now defaults to structured rich-text blocks, and command/config examples should be emitted as code blocks when writing release-facing docs.
 
 ## Documentation
 

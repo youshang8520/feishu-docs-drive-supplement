@@ -98,6 +98,106 @@ app_secret = "inherit_secret"
     assert data["result"]["block_id"] == "blk_tok"
 
 
+def test_route_docs_append_code_command(monkeypatch, tmp_path):
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text(
+        """
+[[projects]]
+name = "claudecode"
+
+[[projects.platforms]]
+type = "feishu"
+[projects.platforms.options]
+app_id = "inherit_app"
+app_secret = "inherit_secret"
+""".strip(),
+        encoding="utf-8",
+    )
+    user_auth = tmp_path / "feishu_user_auth.json"
+    user_auth.write_text(
+        json.dumps(
+            {
+                "auth_mode": "user",
+                "user_access_token": "uat",
+                "user_refresh_token": "urt",
+                "user_token_expires_at": 4102444800,
+                "user_refresh_expires_at": 4102444800,
+                "user_open_id": "ou_user",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("CC_CONNECT_CONFIG_PATH", str(cfg_file))
+    monkeypatch.setattr("cc_feishu.config.USER_AUTH_FILE", user_auth)
+    monkeypatch.setattr("cc_feishu.chat_router.USER_AUTH_FILE", user_auth)
+
+    def _fake_append_code(self, doc_token, text, *, language=49, wrap=True, index=None):
+        assert doc_token == "doc_tok"
+        assert text == "print('hi')"
+        assert language == 7
+        assert wrap is False
+        assert index == 3
+        return {"doc_token": doc_token, "text": text, "language": language, "wrap": wrap, "index": index}
+
+    monkeypatch.setattr("cc_feishu.chat_router.DocsService.append_code_block", _fake_append_code)
+
+    data = route_command('/feishu docs append-code --doc doc_tok --text "print(\'hi\')" --language 7 --no-wrap --index 3')
+
+    assert data["ok"] is True
+    assert data["tool"] == "docs.append_code"
+    assert data["result"]["wrap"] is False
+
+
+def test_route_docs_append_rich_text_command(monkeypatch, tmp_path):
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text(
+        """
+[[projects]]
+name = "claudecode"
+
+[[projects.platforms]]
+type = "feishu"
+[projects.platforms.options]
+app_id = "inherit_app"
+app_secret = "inherit_secret"
+""".strip(),
+        encoding="utf-8",
+    )
+    user_auth = tmp_path / "feishu_user_auth.json"
+    user_auth.write_text(
+        json.dumps(
+            {
+                "auth_mode": "user",
+                "user_access_token": "uat",
+                "user_refresh_token": "urt",
+                "user_token_expires_at": 4102444800,
+                "user_refresh_expires_at": 4102444800,
+                "user_open_id": "ou_user",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("CC_CONNECT_CONFIG_PATH", str(cfg_file))
+    monkeypatch.setattr("cc_feishu.config.USER_AUTH_FILE", user_auth)
+    monkeypatch.setattr("cc_feishu.chat_router.USER_AUTH_FILE", user_auth)
+
+    def _fake_append_rich_text(self, doc_token, blocks, *, index=None):
+        assert doc_token == "doc_tok"
+        assert blocks == [{"type": "heading", "text": "Title"}, {"type": "code", "text": "x = 1"}]
+        assert index == 1
+        return {"doc_token": doc_token, "blocks": blocks, "index": index}
+
+    monkeypatch.setattr("cc_feishu.chat_router.DocsService.append_rich_text", _fake_append_rich_text)
+
+    data = route_command("/feishu docs append-rich-text --doc doc_tok --blocks '[{\"type\":\"heading\",\"text\":\"Title\"},{\"type\":\"code\",\"text\":\"x = 1\"}]' --index 1")
+
+    assert data["ok"] is True
+    assert data["tool"] == "docs.append_rich_text"
+    assert data["result"]["blocks"][1]["type"] == "code"
+
+
 def test_route_bitable_list_fields_command(monkeypatch, tmp_path):
     cfg_file = tmp_path / "config.toml"
     cfg_file.write_text(

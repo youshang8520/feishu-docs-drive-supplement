@@ -226,6 +226,51 @@ TOOLS = [
         },
     },
     {
+        "name": "docs.append_code",
+        "description": "Append a code block to a Feishu document",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "doc_token": {"type": "string", "description": "Document token"},
+                "text": {"type": "string", "description": "Code content"},
+                "language": {"type": "integer", "description": "Code block language enum"},
+                "wrap": {"type": "boolean", "description": "Wrap long lines in code block"},
+                "index": {"type": "integer", "description": "Insert position"}
+            },
+            "required": ["doc_token", "text"],
+        },
+    },
+    {
+        "name": "docs.append_rich_text",
+        "description": "Append multiple rich-text blocks to a Feishu document in one request",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "doc_token": {"type": "string", "description": "Document token"},
+                "blocks": {
+                    "type": "array",
+                    "description": "Ordered rich-text blocks",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": {"type": "string", "description": "Block type: paragraph, text, heading, bullet, code"},
+                            "text": {"type": "string", "description": "Block text"},
+                            "level": {"type": "integer", "description": "Heading level for heading blocks"},
+                            "bold": {"type": "boolean", "description": "Bold style for paragraph/text blocks"},
+                            "italic": {"type": "boolean", "description": "Italic style for paragraph/text blocks"},
+                            "underline": {"type": "boolean", "description": "Underline style for paragraph/text blocks"},
+                            "language": {"type": "integer", "description": "Code block language enum"},
+                            "wrap": {"type": "boolean", "description": "Wrap code block lines"}
+                        },
+                        "required": ["type", "text"]
+                    }
+                },
+                "index": {"type": "integer", "description": "Insert position"}
+            },
+            "required": ["doc_token", "blocks"],
+        },
+    },
+    {
         "name": "docs.update",
         "description": "Update block text in a Feishu document",
         "inputSchema": {

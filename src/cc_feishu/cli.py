@@ -227,6 +227,20 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--underline", action="store_true")
     p.add_argument("--index", type=int)
 
+    p = docs_sub.add_parser("append-code")
+    p.add_argument("--doc", required=True)
+    p.add_argument("--text", required=True)
+    p.add_argument("--language", type=int, default=49)
+    p.add_argument("--wrap", dest="wrap", action="store_true")
+    p.add_argument("--no-wrap", dest="wrap", action="store_false")
+    p.set_defaults(wrap=True)
+    p.add_argument("--index", type=int)
+
+    p = docs_sub.add_parser("append-rich-text")
+    p.add_argument("--doc", required=True)
+    p.add_argument("--blocks", required=True)
+    p.add_argument("--index", type=int)
+
     p = docs_sub.add_parser("update")
     p.add_argument("--doc", required=True)
     p.add_argument("--text", required=True)
@@ -456,6 +470,18 @@ def main(argv: list[str] | None = None) -> int:
                         index=args.index,
                     )
                 )
+            elif args.action == "append-code":
+                _print(
+                    docs.append_code_block(
+                        args.doc,
+                        args.text,
+                        language=args.language,
+                        wrap=args.wrap,
+                        index=args.index,
+                    )
+                )
+            elif args.action == "append-rich-text":
+                _print(docs.append_rich_text(args.doc, _json(args.blocks), index=args.index))
             elif args.action == "update":
                 _print(docs.update_text(args.doc, args.text, block_id=args.block))
             elif args.action == "delete":

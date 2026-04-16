@@ -202,6 +202,18 @@ def _build_parser() -> _ChatParser:
     p.add_argument("--italic", action="store_true")
     p.add_argument("--underline", action="store_true")
     p.add_argument("--index", type=int)
+    p = docs_sub.add_parser("append-code", add_help=False)
+    p.add_argument("--doc", required=True)
+    p.add_argument("--text", required=True)
+    p.add_argument("--language", type=int, default=49)
+    p.add_argument("--wrap", dest="wrap", action="store_true")
+    p.add_argument("--no-wrap", dest="wrap", action="store_false")
+    p.set_defaults(wrap=True)
+    p.add_argument("--index", type=int)
+    p = docs_sub.add_parser("append-rich-text", add_help=False)
+    p.add_argument("--doc", required=True)
+    p.add_argument("--blocks", required=True)
+    p.add_argument("--index", type=int)
     p = docs_sub.add_parser("update", add_help=False)
     p.add_argument("--doc", required=True)
     p.add_argument("--text", required=True)
@@ -419,6 +431,18 @@ def route_command(command: str) -> dict[str, Any]:
                     underline=args.underline,
                     index=args.index,
                 )
+            elif args.action == "append-code":
+                tool = "docs.append_code"
+                result = docs.append_code_block(
+                    args.doc,
+                    args.text,
+                    language=args.language,
+                    wrap=args.wrap,
+                    index=args.index,
+                )
+            elif args.action == "append-rich-text":
+                tool = "docs.append_rich_text"
+                result = docs.append_rich_text(args.doc, json.loads(args.blocks), index=args.index)
             elif args.action == "update":
                 tool = "docs.update"
                 result = docs.update_text(args.doc, args.text, block_id=args.block)
