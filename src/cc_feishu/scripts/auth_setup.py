@@ -2,6 +2,10 @@
 """
 One-click Feishu authorization setup script.
 
+This supplement is intended for Claude Code + cc-connect usage. It reuses
+cc-connect credentials/configuration, then optionally wires Claude Code MCP
+registration when the `claude` CLI is available.
+
 This script automatically:
 1. Checks prerequisites (cc-connect config)
 2. Configures MCP plugin in ~/.claude/plugins/marketplaces/local/feishu/
@@ -14,6 +18,8 @@ Usage:
 """
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -26,6 +32,7 @@ MESSAGES = {
         "detect_dir": "Detecting project directory",
         "setup_mcp_plugin": "Setting up MCP plugin (Claude Code)",
         "setup_mcp": "Setting up MCP configuration (project-level)",
+        "register_mcp": "Registering MCP server with Claude Code",
         "load_config": "Loading configuration",
         "check_auth": "Checking authorization status",
         "start_auth": "Starting authorization flow",
@@ -33,6 +40,10 @@ MESSAGES = {
         "working_dir": "Working directory",
         "mcp_plugin_written": "MCP plugin written to",
         "mcp_written": "MCP config written to",
+        "mcp_registered": "MCP server registered in Claude Code",
+        "mcp_already_registered": "MCP server already registered in Claude Code",
+        "mcp_register_skipped": "Skipping Claude Code MCP registration",
+        "mcp_register_failed": "Claude Code MCP registration failed, but continuing",
         "inherited": "Inherited from cc-connect",
         "already_auth": "Already authorized and token is valid",
         "token_expires": "Token expires",
@@ -67,7 +78,10 @@ MESSAGES = {
         "error_import": "Error: cc_feishu package not installed.",
         "error_install": "Please run: pip install feishu-docs-drive-supplement",
         "warn_mcp_failed": "MCP config setup failed, but continuing",
-        "cancelled": "Cancelled by user.",
+        "claude_optional": "Claude CLI is optional; MCP registration will be skipped if unavailable",
+        "host_requirement": "This supplement reuses cc-connect credentials and is not a standalone Feishu runtime",
+        "error_missing_host": "Error: Missing cc-connect-hosted Feishu credentials.",
+        "error_host_required": "This package expects cc-connect to provide Feishu app credentials",
     },
     "zh": {
         "title": "飞书授权设置",
@@ -75,6 +89,7 @@ MESSAGES = {
         "detect_dir": "检测项目目录",
         "setup_mcp_plugin": "配置 MCP 插件 (Claude Code)",
         "setup_mcp": "配置 MCP 服务器 (项目级)",
+        "register_mcp": "向 Claude Code 注册 MCP 服务器",
         "load_config": "加载配置",
         "check_auth": "检查授权状态",
         "start_auth": "启动授权流程",
@@ -82,6 +97,10 @@ MESSAGES = {
         "working_dir": "工作目录",
         "mcp_plugin_written": "MCP 插件已写入",
         "mcp_written": "MCP 配置已写入",
+        "mcp_registered": "已在 Claude Code 中注册 MCP 服务器",
+        "mcp_already_registered": "Claude Code 中已注册 MCP 服务器",
+        "mcp_register_skipped": "跳过 Claude Code MCP 注册",
+        "mcp_register_failed": "Claude Code MCP 注册失败，但继续执行",
         "inherited": "已从 cc-connect 继承",
         "already_auth": "已授权且 token 有效",
         "token_expires": "Token 过期时间",
@@ -116,7 +135,10 @@ MESSAGES = {
         "error_import": "错误: cc_feishu 包未安装。",
         "error_install": "请运行: pip install feishu-docs-drive-supplement",
         "warn_mcp_failed": "MCP 配置设置失败，但继续执行",
-        "cancelled": "用户取消。",
+        "claude_optional": "`claude` CLI 为可选项；不可用时只跳过 MCP 注册",
+        "host_requirement": "该补丁复用 cc-connect 凭证，不是独立飞书运行时",
+        "error_missing_host": "错误: 缺少由 cc-connect 承载的飞书凭证。",
+        "error_host_required": "该包要求由 cc-connect 提供飞书应用凭证",
     }
 }
 
@@ -249,6 +271,50 @@ def setup_mcp_plugin() -> bool:
         return False
 
 
+def register_mcp_server(project_dir: Path) -> tuple[bool, str]:
+    """Register Feishu MCP server in Claude Code project scope when possible."""
+    claude_exe = shutil.which("claude")
+    if not claude_exe:
+        return False, msg("mcp_register_skipped") + ": claude command not found"
+
+    args = [
+        claude_exe,
+        "mcp",
+        "add",
+        "--scope",
+        "project",
+        "feishu",
+        "--",
+        "cc-feishu-mcp",
+    ]
+
+    try:
+        result = subprocess.run(
+            args,
+            cwd=str(project_dir),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except Exception as exc:
+        return False, f"{msg('mcp_register_failed')}: {exc}"
+
+    combined = "\n".join(
+        part.strip() for part in (result.stdout, result.stderr) if part and part.strip()
+    )
+
+    if result.returncode == 0:
+        return True, combined or msg("mcp_registered")
+
+    lower = combined.lower()
+    if "already" in lower and "feishu" in lower:
+        return True, combined or msg("mcp_already_registered")
+
+    return False, combined or msg("mcp_register_failed")
+
+
 def setup_mcp_config(project_dir: Path) -> bool:
     """Setup MCP configuration in .claude/mcp.json"""
     try:
@@ -306,11 +372,11 @@ def main():
 
     # Detect project directory
     project_dir = Path.cwd()
-    print(f"[1/6] {msg('detect_dir')}...")
+    print(f"[1/7] {msg('detect_dir')}...")
     print(f"  -> {msg('working_dir')}: {project_dir}")
 
     # Setup MCP plugin (Claude Code)
-    print(f"\n[2/6] {msg('setup_mcp_plugin')}...")
+    print(f"\n[2/7] {msg('setup_mcp_plugin')}...")
     if setup_mcp_plugin():
         plugin_dir = Path.home() / ".claude" / "plugins" / "marketplaces" / "local" / "feishu"
         print(f"  [OK] {msg('mcp_plugin_written')} {plugin_dir}")
@@ -318,26 +384,37 @@ def main():
         print(f"  [WARN] {msg('warn_mcp_failed')}")
 
     # Setup MCP configuration (project-level, optional)
-    print(f"\n[3/6] {msg('setup_mcp')}...")
+    print(f"\n[3/7] {msg('setup_mcp')}...")
     if setup_mcp_config(project_dir):
         print(f"  [OK] {msg('mcp_written')} {project_dir / '.claude' / 'mcp.json'}")
     else:
         print(f"  [WARN] {msg('warn_mcp_failed')}")
 
+    print(f"\n[4/7] {msg('register_mcp')}...")
+    registered, register_message = register_mcp_server(project_dir)
+    if registered:
+        print(f"  [OK] {msg('mcp_registered')}")
+        if register_message.strip() and register_message.strip() != msg("mcp_registered"):
+            print(f"     {register_message.strip()}")
+    else:
+        print(f"  [WARN] {register_message}")
+
     # Load config
-    print(f"\n[4/6] {msg('load_config')}...")
+    print(f"\n[5/7] {msg('load_config')}...")
+    print(f"  -> {msg('host_requirement')}")
+    print(f"  -> {msg('claude_optional')}")
     try:
         config = load_config()
     except Exception as e:
-        print(f"{msg('error_missing_config')}")
-        print(f"{msg('error_configure')}:")
+        print(f"{msg('error_missing_host')}")
+        print(f"{msg('error_host_required')}:")
         print("  ~/.cc-connect/config.toml")
         print(f"Details: {e}")
         sys.exit(1)
 
     if not config.app_id or not config.app_secret:
-        print(msg("error_missing_config"))
-        print(f"{msg('error_configure')}:")
+        print(msg("error_missing_host"))
+        print(f"{msg('error_host_required')}:")
         print("  ~/.cc-connect/config.toml")
         sys.exit(1)
 
@@ -347,7 +424,7 @@ def main():
     provider = FeishuTokenProvider(config)
 
     # Check if already authorized
-    print(f"\n[5/6] {msg('check_auth')}...")
+    print(f"\n[6/7] {msg('check_auth')}...")
     now = int(time.time())
     has_refresh_token = bool(config.user_refresh_token.strip())
     access_token_valid = bool(config.user_access_token.strip()) and now < config.user_token_expires_at - 60
@@ -385,7 +462,7 @@ def main():
                 print(f"  -> {msg('will_retry')}...")
 
     # Start device authorization
-    print(f"\n[6/6] {msg('start_auth')}...")
+    print(f"\n[7/7] {msg('start_auth')}...")
     try:
         auth_data = provider.start_device_authorization(DEFAULT_SCOPES)
     except Exception as e:
@@ -477,5 +554,3 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         sys.exit(1)
-
-

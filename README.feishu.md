@@ -1,10 +1,11 @@
 # Feishu Docs & Drive Supplement
 
-A Python supplement package for cc-connect that adds Feishu Docs, Drive, Sheets, and Bitable capabilities with inherited configuration, CLI tooling, MCP tools, and user-authorization helpers.
+A Python supplement package for cc-connect, optimized for Claude Code, that reuses cc-connect credentials/configuration and adds Feishu Docs, Drive, Sheets, and Bitable capabilities with CLI tooling, MCP tools, and user-authorization helpers.
 
 ## What this package does
 
-- Inherits Feishu app configuration from an existing cc-connect config.
+- Reuses Feishu app credentials/configuration from an existing cc-connect setup.
+- Is positioned as a Claude Code-oriented cc-connect supplement, not a standalone Feishu runtime.
 - Adds CLI and MCP entrypoints for Feishu resource operations.
 - Supports a single-link user-authorization flow.
 - Provides practical operations for:
@@ -13,6 +14,7 @@ A Python supplement package for cc-connect that adds Feishu Docs, Drive, Sheets,
   - Docs
   - Sheets
   - Bitable
+- Adds direct-content tools so explicit read requests can be answered in one step.
 
 ## Install
 
@@ -29,14 +31,18 @@ feishu-auth-setup
 This will:
 1. Configure MCP plugin for Claude Code
 2. Set up project-level MCP configuration
-3. Guide you through authorization
-4. Save tokens automatically
+3. Register the Feishu MCP server in Claude Code project scope when `claude` is available
+4. Guide you through authorization
+5. Save tokens automatically
 
 After setup, restart Claude Code and you can use Feishu features naturally in conversations.
 
 **Examples:**
 - "List my Feishu drive files"
-- "Create a document called Meeting Notes"
+- "Read this folder and tell me what files are inside"
+- "Read the document at <url>"
+- "Read this sheet: <url>"
+- "Read this bitable view: <url>"
 
 ## For advanced users (CLI commands)
 
@@ -46,12 +52,17 @@ If you need manual control via terminal/command line:
 # Check current state
 feishu auth status
 
-# List drive files
+# Read drive content
 feishu drive list --folder root
+feishu drive read-folder --folder root
 
-# Create and edit documents
+# Create and read documents
 feishu docs create --title "My Document"
-feishu docs append --doc <doc_token> --text "hello"
+feishu docs read-content --doc <doc_token>
+
+# Read sheet / bitable content directly
+feishu sheets read-content --sheet <sheet_token> --range A1:C10
+feishu bitable read-content --app <app_token> --table <table_id>
 ```
 
 **Note:** These are terminal commands for developers. Regular users should use Claude Code conversations.
@@ -78,6 +89,7 @@ Successful user auth is persisted to `~/.cc-connect/feishu_user_auth.json`.
 
 #### Drive / Upload
 - `drive.list`
+- `drive.read_folder`
 - `drive.create_folder`
 - `drive.read`
 - `drive.update`
@@ -88,6 +100,7 @@ Successful user auth is persisted to `~/.cc-connect/feishu_user_auth.json`.
 #### Docs / Sheets / Bitable
 - `docs.create`
 - `docs.read`
+- `docs.read_content`
 - `docs.read_blocks`
 - `docs.append`
 - `docs.append_heading`
@@ -97,6 +110,7 @@ Successful user auth is persisted to `~/.cc-connect/feishu_user_auth.json`.
 - `docs.delete`
 - `sheets.create`
 - `sheets.read_range`
+- `sheets.read_content`
 - `sheets.write`
 - `sheets.append_rows`
 - `sheets.delete_range`
@@ -104,6 +118,7 @@ Successful user auth is persisted to `~/.cc-connect/feishu_user_auth.json`.
 - `bitable.list_fields`
 - `bitable.create_table`
 - `bitable.read_records`
+- `bitable.read_content`
 - `bitable.create_record`
 - `bitable.update_record`
 - `bitable.delete_record`

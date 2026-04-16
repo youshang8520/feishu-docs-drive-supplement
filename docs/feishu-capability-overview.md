@@ -16,6 +16,7 @@ It is designed to:
 - inherit Feishu config from cc-connect
 - expose a CLI surface for direct/manual use
 - expose an MCP surface for higher-level plugins or bots
+- provide direct-content read helpers for explicit user read requests
 
 ## 2. Authorization model
 
@@ -35,12 +36,12 @@ This repo does not include:
 - a hosted webhook runtime
 - multi-user session orchestration
 
-
 ## 3. Current capability matrix
 
 ### Drive
 Implemented:
 - list folder contents
+- read folder contents directly with normalized results via `drive.read_folder`
 - create folder
 - read file metadata
 - move file/folder by target folder token
@@ -61,6 +62,7 @@ Implemented:
 Implemented:
 - create document
 - read document metadata
+- read document content directly via `docs.read_content`
 - list blocks
 - append plain text
 - append headings
@@ -83,6 +85,7 @@ Implemented:
 - create spreadsheet
 - resolve sheet id
 - read range
+- read sheet content directly with normalized values via `sheets.read_content`
 - write range
 - append rows
 - delete range / clear range
@@ -99,6 +102,7 @@ Implemented:
 - list fields
 - create table
 - read records
+- read bitable content directly with normalized records via `bitable.read_content`
 - create record
 - update record
 - delete record
@@ -109,7 +113,6 @@ Practical integration guidance:
 - then construct `fields` for create/update
 
 Not yet implemented:
-- pagination controls as first-class user-facing options
 - richer filter/sort passthrough
 - batch record helpers
 
@@ -124,7 +127,7 @@ The intended experience is:
 6. the script automatically completes authorization
 7. Feishu resource features become available
 
-This repo provides the auth bootstrap, pending-auth persistence, and CLI/MCP entrypoints needed for that flow.
+This repo provides the auth bootstrap, pending-auth persistence, CLI/MCP entrypoints, and direct-content read helpers needed for that flow.
 
 ## 5. Current package positioning
 
@@ -134,6 +137,7 @@ The package should be described as:
 - with CLI and MCP entrypoints
 - with strong Drive / Upload / Sheets / Bitable support
 - with basic-to-mid-level Docs support
+- with direct-content read paths for common explicit read requests
 - not a full standalone hosted bot runtime
 
 ## 6. Practical recommendation

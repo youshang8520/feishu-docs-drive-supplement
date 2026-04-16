@@ -5,8 +5,13 @@
 1. **cc-connect installed and configured**
    - Config file at: `~/.cc-connect/config.toml`
    - Must include Feishu app credentials
+   - This package reuses cc-connect credentials and is not positioned as a standalone Feishu runtime
 
 2. **Python 3.10+**
+
+3. **`claude` CLI (optional but recommended)**
+   - Used for automatic MCP registration in Claude Code
+   - If unavailable, setup continues and only skips Claude MCP registration
 
 ## Installation
 
@@ -56,23 +61,47 @@ feishu-auth-setup
 ```
 
 This will:
-1. Check your configuration
+1. Check your cc-connect-hosted credential configuration
 2. Set up MCP plugin for Claude Code
 3. Set up project-level MCP configuration
-4. Guide you through authorization
-5. Save tokens automatically
+4. Register the Feishu MCP server in Claude Code project scope when `claude` is available
+5. Guide you through authorization
+6. Save tokens automatically
+
+If `claude` is unavailable, setup continues and only skips Claude MCP registration.
+If cc-connect credentials are missing, setup stops with a clear message because this package is designed to reuse cc-connect credentials rather than replace them.
 
 After setup, restart Claude Code and you can use Feishu features naturally in conversations.
 
 ## Verify Installation
 
 ```bash
+# Run one-click setup first
+feishu-auth-setup
+
 # Test CLI
 feishu auth status
 
 # Test MCP server
 cc-feishu-mcp auth.status --payload '{}'
+
+# Verify Claude Code project registration
+claude mcp get feishu
 ```
+
+Expected registration output should show `feishu` connected with `cc-feishu-mcp` as the command.
+
+## Natural-language examples
+
+After setup, you can ask Claude Code directly:
+- "List my Feishu drive files"
+- "Read this folder and tell me what files are inside"
+- "Read the document at <url>"
+- "Read this sheet: <url>"
+- "Read this bitable view: <url>"
+- "Create a document called 'Meeting Notes'"
+
+These map to higher-level tools like `drive.read_folder`, `docs.read_content`, `sheets.read_content`, and `bitable.read_content`, which are intended to avoid unnecessary confirmation turns for explicit read requests.
 
 ## Claude Desktop Integration
 
@@ -102,17 +131,11 @@ Restart Claude Desktop.
 
 After setup, you can ask naturally:
 - "List my Feishu drive files"
-- "Create a document called 'Meeting Notes'"
 - "Read the document at <url>"
+- "Read this sheet: <url>"
+- "Create a document called 'Meeting Notes'"
 
 Claude will automatically use the Feishu MCP tools.
-
-## Workspace Skill (cc-connect)
-
-
-```
-```
-
 
 ## Troubleshooting
 
@@ -149,11 +172,17 @@ Make sure either:
    cc-feishu-mcp auth.status --payload '{}'
    ```
 
-2. Check Claude Desktop logs for errors
+2. Verify Claude Code registered the project server:
+   ```bash
+   claude mcp get feishu
+   ```
 
-3. Make sure the config file syntax is correct (valid JSON)
+3. Check `.mcp.json` or `.claude/mcp.json` syntax is correct (valid JSON)
+
+4. Restart Claude Code after running `feishu-auth-setup`
 
 ## Next Steps
 
 - See `docs/feishu-capability-overview.md` for detailed capability matrix
 - See `docs/local-claude-import.md` for workspace integration notes
+- See `docs/mcp-auto-discovery.md` for MCP registration details

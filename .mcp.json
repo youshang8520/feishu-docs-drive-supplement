@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "feishu": {
+      "type": "stdio",
+      "command": "cc-feishu-mcp",
+      "args": [],
+      "env": {}
+    }
+  }
+}
