@@ -19,10 +19,13 @@ app_secret = "inherit_secret"
         encoding="utf-8",
     )
     pending_auth = tmp_path / "feishu_pending_auth.json"
+    user_auth = tmp_path / "feishu_user_auth.json"
 
     monkeypatch.setenv("CC_CONNECT_CONFIG_PATH", str(cfg_file))
     monkeypatch.setattr("cc_feishu.config.PENDING_AUTH_FILE", pending_auth)
     monkeypatch.setattr("cc_feishu.chat_router.PENDING_AUTH_FILE", pending_auth)
+    monkeypatch.setattr("cc_feishu.config.USER_AUTH_FILE", user_auth)
+    monkeypatch.setattr("cc_feishu.chat_router.USER_AUTH_FILE", user_auth)
 
     def _fake_start(self, scope):
         return {
@@ -43,60 +46,6 @@ app_secret = "inherit_secret"
     assert data["tool"] == "auth.start"
     assert data["status"] == "pending_authorization"
     assert "verification_uri_complete" in data
-    assert pending_auth.exists() is True
-
-
-def test_route_auth_send_link_command_sends_chat_message(monkeypatch, tmp_path):
-    cfg_file = tmp_path / "config.toml"
-    cfg_file.write_text(
-        """
-[[projects]]
-name = "claudecode"
-
-[[projects.platforms]]
-type = "feishu"
-[projects.platforms.options]
-app_id = "inherit_app"
-app_secret = "inherit_secret"
-""".strip(),
-        encoding="utf-8",
-    )
-    pending_auth = tmp_path / "feishu_pending_auth.json"
-
-    monkeypatch.setenv("CC_CONNECT_CONFIG_PATH", str(cfg_file))
-    monkeypatch.setattr("cc_feishu.config.PENDING_AUTH_FILE", pending_auth)
-    monkeypatch.setattr("cc_feishu.chat_router.PENDING_AUTH_FILE", pending_auth)
-
-    def _fake_start(self, scope):
-        return {
-            "device_code": "device_code",
-            "user_code": "user_code",
-            "verification_uri": "https://accounts.feishu.cn/verify",
-            "verification_uri_complete": "https://accounts.feishu.cn/verify?user_code=user_code",
-            "interval": 2,
-            "expires_in": 900,
-            "scope": scope,
-        }
-
-    def _fake_send_text(self, receive_id, text, *, receive_id_type="chat_id"):
-        assert receive_id == "oc_test_chat"
-        assert receive_id_type == "chat_id"
-        assert text == "请点击链接完成飞书授权：https://accounts.feishu.cn/verify?user_code=user_code"
-        return {"message_id": "om_message"}
-
-    monkeypatch.setattr("cc_feishu.chat_router.FeishuTokenProvider.start_device_authorization", _fake_start)
-    monkeypatch.setattr("cc_feishu.chat_router.MessagesService.send_text", _fake_send_text)
-
-    data = route_command("/feishu auth send-link --receive-id oc_test_chat")
-
-    assert data["ok"] is True
-    assert data["tool"] == "auth.send_link"
-    assert data["status"] == "pending_authorization"
-    assert data["message"] == "Sent Feishu authorization link."
-    assert data["reply"] == "请点击链接完成飞书授权：https://accounts.feishu.cn/verify?user_code=user_code"
-    assert data["receive_id"] == "oc_test_chat"
-    assert data["receive_id_type"] == "chat_id"
-    assert data["sent_message"]["message_id"] == "om_message"
     assert pending_auth.exists() is True
 
 

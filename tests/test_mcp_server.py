@@ -111,51 +111,6 @@ def test_mcp_auth_start_reuses_pending_link(monkeypatch, tmp_path, capsys):
     assert data["verification_uri_complete"] == "https://accounts.feishu.cn/verify?user_code=user_code"
 
 
-def test_mcp_auth_send_link_sends_chat_message(monkeypatch, tmp_path, capsys):
-    cfg_file = tmp_path / "config.toml"
-    _write_cfg(cfg_file)
-    pending_auth = tmp_path / "feishu_pending_auth.json"
-
-    monkeypatch.setenv("CC_CONNECT_CONFIG_PATH", str(cfg_file))
-    monkeypatch.setattr("cc_feishu.config.PENDING_AUTH_FILE", pending_auth)
-    monkeypatch.setattr("cc_feishu.mcp.server.PENDING_AUTH_FILE", pending_auth)
-
-    def _fake_start(self, scope):
-        return {
-            "device_code": "device_code",
-            "user_code": "user_code",
-            "verification_uri": "https://accounts.feishu.cn/verify",
-            "verification_uri_complete": "https://accounts.feishu.cn/verify?user_code=user_code",
-            "interval": 2,
-            "expires_in": 900,
-            "scope": scope,
-        }
-
-    def _fake_send_text(self, receive_id, text, *, receive_id_type="chat_id"):
-        assert receive_id == "oc_test_chat"
-        assert receive_id_type == "chat_id"
-        assert text == "请点击链接完成飞书授权：https://accounts.feishu.cn/verify?user_code=user_code"
-        return {"message_id": "om_message"}
-
-    monkeypatch.setattr("cc_feishu.mcp.server.FeishuTokenProvider.start_device_authorization", _fake_start)
-    monkeypatch.setattr("cc_feishu.mcp.server.MessagesService.send_text", _fake_send_text)
-
-    payload = json.dumps({"receive_id": "oc_test_chat"})
-    exit_code = main(["auth.send_link", "--payload", payload])
-    out = capsys.readouterr().out
-
-    assert exit_code == 0
-    data = json.loads(out)
-    assert data["ok"] is True
-    assert data["status"] == "pending_authorization"
-    assert data["message"] == "Sent Feishu authorization link."
-    assert data["receive_id"] == "oc_test_chat"
-    assert data["receive_id_type"] == "chat_id"
-    assert data["sent_message"]["message_id"] == "om_message"
-    persisted = json.loads(pending_auth.read_text(encoding="utf-8"))
-    assert persisted["device_code"] == "device_code"
-
-
 def test_mcp_auth_poll_uses_pending_state_when_device_code_is_omitted(monkeypatch, tmp_path, capsys):
     cfg_file = tmp_path / "config.toml"
     _write_cfg(cfg_file)

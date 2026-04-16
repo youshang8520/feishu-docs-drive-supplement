@@ -326,63 +326,6 @@ app_secret = "inherit_secret"
     assert persisted["user_open_id"] == "ou_login"
 
 
-def test_cli_auth_send_link_prints_sent_message(monkeypatch, tmp_path, capsys):
-    cfg_file = tmp_path / "config.toml"
-    cfg_file.write_text(
-        """
-[[projects]]
-name = "claudecode"
-
-[[projects.platforms]]
-type = "feishu"
-[projects.platforms.options]
-app_id = "inherit_app"
-app_secret = "inherit_secret"
-""".strip(),
-        encoding="utf-8",
-    )
-    pending_auth = tmp_path / "feishu_pending_auth.json"
-
-    monkeypatch.setenv("CC_CONNECT_CONFIG_PATH", str(cfg_file))
-    monkeypatch.setattr("cc_feishu.config.PENDING_AUTH_FILE", pending_auth)
-    monkeypatch.setattr("cc_feishu.cli.PENDING_AUTH_FILE", pending_auth)
-
-    def _fake_start(self, scope):
-        assert scope == DEFAULT_AUTH_SCOPE
-        return {
-            "device_code": "device_code",
-            "user_code": "user_code",
-            "verification_uri": "https://accounts.feishu.cn/verify",
-            "verification_uri_complete": "https://accounts.feishu.cn/verify?user_code=user_code",
-            "interval": 2,
-            "expires_in": 900,
-            "scope": scope,
-        }
-
-    def _fake_send_text(self, receive_id, text, *, receive_id_type="chat_id"):
-        assert receive_id == "oc_test_chat"
-        assert receive_id_type == "chat_id"
-        assert text == "请点击链接完成飞书授权：https://accounts.feishu.cn/verify?user_code=user_code"
-        return {"message_id": "om_message"}
-
-    monkeypatch.setattr(FeishuTokenProvider, "start_device_authorization", _fake_start)
-    monkeypatch.setattr("cc_feishu.cli.MessagesService.send_text", _fake_send_text)
-
-    exit_code = main(["auth", "send-link", "--receive-id", "oc_test_chat"])
-    out = capsys.readouterr().out
-
-    assert exit_code == 0
-    data = json.loads(out)
-    assert data["ok"] is True
-    assert data["status"] == "pending_authorization"
-    assert data["message"] == "Sent Feishu authorization link."
-    assert data["receive_id"] == "oc_test_chat"
-    assert data["receive_id_type"] == "chat_id"
-    assert data["sent_message"]["message_id"] == "om_message"
-    persisted = json.loads(pending_auth.read_text(encoding="utf-8"))
-    assert persisted["device_code"] == "device_code"
-
-
 def test_device_authorization_adds_offline_access(monkeypatch):
     cfg = FeishuConfig(
         app_id="app",

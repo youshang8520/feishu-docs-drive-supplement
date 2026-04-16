@@ -6,9 +6,8 @@ This script automatically:
 1. Checks prerequisites (cc-connect config)
 2. Configures MCP plugin in ~/.claude/plugins/marketplaces/local/feishu/
 3. Configures MCP server in .claude/mcp.json (project-level)
-4. Installs workspace skill to skills/feishu/
-5. Checks authorization status (auto-refresh if needed)
-6. Guides through first-time authorization if required
+4. Checks authorization status (auto-refresh if needed)
+5. Guides through first-time authorization if required
 
 Usage:
     feishu-auth-setup
@@ -27,15 +26,13 @@ MESSAGES = {
         "detect_dir": "Detecting project directory",
         "setup_mcp_plugin": "Setting up MCP plugin (Claude Code)",
         "setup_mcp": "Setting up MCP configuration (project-level)",
-        "setup_skill": "Setting up workspace skill",
         "load_config": "Loading configuration",
         "check_auth": "Checking authorization status",
         "start_auth": "Starting authorization flow",
-        "deliver_link": "Delivering authorization link",
+        "deliver_link": "Authorization link",
         "working_dir": "Working directory",
         "mcp_plugin_written": "MCP plugin written to",
         "mcp_written": "MCP config written to",
-        "skill_written": "Skill file written to",
         "inherited": "Inherited from cc-connect",
         "already_auth": "Already authorized and token is valid",
         "token_expires": "Token expires",
@@ -53,16 +50,11 @@ MESSAGES = {
         "refresh_failed": "Refresh failed",
         "will_retry": "Will start new authorization flow",
         "link_generated": "Authorization link generated",
-        "sending_feishu": "Sending to your Feishu",
-        "link_sent": "Authorization link sent to your Feishu",
-        "check_feishu": "Please check your Feishu and click the authorization link.",
-        "send_failed": "Failed to send",
-        "open_manually": "Please open this link manually",
         "first_time": "First-time setup detected",
         "copy_link": "Please copy the following link and open it in your browser",
         "waiting_auth": "Waiting for authorization",
         "press_ctrl_c": "Press Ctrl+C to cancel",
-        "press_enter": "Press Enter after you have authorized in Feishu/browser",
+        "press_enter": "Press Enter after you have authorized in browser",
         "checking_status": "Checking authorization status",
         "auth_failed": "Authorization failed",
         "try_again": "Please try again or check your authorization status.",
@@ -75,7 +67,6 @@ MESSAGES = {
         "error_import": "Error: cc_feishu package not installed.",
         "error_install": "Please run: pip install feishu-docs-drive-supplement",
         "warn_mcp_failed": "MCP config setup failed, but continuing",
-        "warn_skill_failed": "Skill setup failed, but continuing",
         "cancelled": "Cancelled by user.",
     },
     "zh": {
@@ -84,15 +75,13 @@ MESSAGES = {
         "detect_dir": "检测项目目录",
         "setup_mcp_plugin": "配置 MCP 插件 (Claude Code)",
         "setup_mcp": "配置 MCP 服务器 (项目级)",
-        "setup_skill": "安装工作区技能",
         "load_config": "加载配置",
         "check_auth": "检查授权状态",
         "start_auth": "启动授权流程",
-        "deliver_link": "发送授权链接",
+        "deliver_link": "授权链接",
         "working_dir": "工作目录",
         "mcp_plugin_written": "MCP 插件已写入",
         "mcp_written": "MCP 配置已写入",
-        "skill_written": "技能文件已写入",
         "inherited": "已从 cc-connect 继承",
         "already_auth": "已授权且 token 有效",
         "token_expires": "Token 过期时间",
@@ -110,16 +99,11 @@ MESSAGES = {
         "refresh_failed": "刷新失败",
         "will_retry": "将启动新的授权流程",
         "link_generated": "授权链接已生成",
-        "sending_feishu": "发送到您的飞书",
-        "link_sent": "授权链接已发送到您的飞书",
-        "check_feishu": "请检查您的飞书并点击授权链接。",
-        "send_failed": "发送失败",
-        "open_manually": "请手动打开此链接",
         "first_time": "检测到首次设置",
         "copy_link": "请复制以下链接并在浏览器中打开",
         "waiting_auth": "等待授权",
         "press_ctrl_c": "按 Ctrl+C 取消",
-        "press_enter": "在飞书/浏览器中授权后按回车",
+        "press_enter": "在浏览器中授权后按回车",
         "checking_status": "检查授权状态",
         "auth_failed": "授权失败",
         "try_again": "请重试或检查您的授权状态。",
@@ -132,7 +116,6 @@ MESSAGES = {
         "error_import": "错误: cc_feishu 包未安装。",
         "error_install": "请运行: pip install feishu-docs-drive-supplement",
         "warn_mcp_failed": "MCP 配置设置失败，但继续执行",
-        "warn_skill_failed": "技能设置失败，但继续执行",
         "cancelled": "用户取消。",
     }
 }
@@ -168,15 +151,11 @@ try:
         load_config,
         save_pending_auth_state,
     )
-    from cc_feishu.services.messages import MessagesService
-    from cc_feishu.client.http import FeishuHttpClient
 except ImportError as e:
     print(msg("error_import"))
     print(msg("error_install"))
     print(f"Details: {e}")
     sys.exit(1)
-
-# __CONTINUE_HERE__
 
 # All required scopes for Drive, Docs, Sheets, Bitable
 DEFAULT_SCOPES = (
@@ -226,94 +205,6 @@ DEFAULT_SCOPES = (
     "auth:user.id:read "
     "offline_access"
 )
-
-SKILL_CONTENT = """---
-name: feishu
-description: Feishu Drive, Docs, Sheets, and Bitable operations. Use this to list/create/read/update files and documents in Feishu.
-argument-hint: "[operation] [arguments]"
-allowed-tools: [Bash]
-category: Integration
-version: 0.1.0
-user-invocable: true
-disable-model-invocation: false
-homepage: https://github.com/youshang8520/feishu-docs-drive-supplement
----
-
-# Feishu Integration
-
-This skill provides access to Feishu Drive, Docs, Sheets, and Bitable through the CLI interface.
-
-## Available Operations
-
-Use the `cc-feishu-chat` command to invoke operations:
-
-### Drive Operations
-- `/feishu drive list --folder <token>` - List files in a folder (use "root" for root directory)
-- `/feishu drive create-folder --parent <token> --name <name>` - Create a new folder
-- `/feishu drive read --token <token>` - Read file metadata
-- `/feishu drive move --token <token> --folder <target>` - Move files/folders
-- `/feishu drive delete --token <token>` - Delete files/folders
-
-### Docs Operations
-- `/feishu docs create --title <title>` - Create a new document
-- `/feishu docs read --doc <token>` - Read document metadata
-- `/feishu docs read-blocks --doc <token>` - List all blocks in a document
-- `/feishu docs append --doc <token> --text <text>` - Append plain text
-- `/feishu docs append-heading --doc <token> --text <text> --level <1-9>` - Append heading
-- `/feishu docs append-bullet --doc <token> --text <text>` - Append bullet list item
-- `/feishu docs append-styled --doc <token> --text <text> [--bold] [--italic]` - Append styled text
-- `/feishu docs update --doc <token> --block <block_id> --text <text>` - Update block text
-- `/feishu docs delete --doc <token>` - Delete a document
-
-### Sheets Operations
-- `/feishu sheets create --title <title>` - Create a new spreadsheet
-- `/feishu sheets read-range --sheet <token> --range <range>` - Read cell range (e.g., "A1:B10")
-- `/feishu sheets write --sheet <token> --range <range> --values <json>` - Write to cell range
-- `/feishu sheets append-rows --sheet <token> --range <range> --values <json>` - Append rows
-- `/feishu sheets delete-range --sheet <token> --range <range>` - Delete/clear cell range
-
-### Bitable Operations
-- `/feishu bitable list-tables --app <token>` - List all tables in a bitable
-- `/feishu bitable list-fields --app <token> --table <id>` - List fields in a table
-- `/feishu bitable create-table --app <token> --name <name>` - Create a new table
-- `/feishu bitable read-records --app <token> --table <id>` - Read records from a table
-- `/feishu bitable create-record --app <token> --table <id> --fields <json>` - Create a new record
-- `/feishu bitable update-record --app <token> --table <id> --record <id> --fields <json>` - Update a record
-- `/feishu bitable delete-record --app <token> --table <id> --record <id>` - Delete a record
-
-### Authorization
-- `/feishu auth` - Check authorization status and start if needed
-- `/feishu auth poll --timeout <seconds>` - Poll for authorization completion
-
-## Usage Notes
-
-1. **Authorization**: First time users need to run `/feishu auth` to authorize. Tokens auto-refresh.
-2. **Root folder**: Use `--folder root` to access root directory
-3. **Token parameters**: Most operations require token parameters (doc_token, sheet_token, app_token, etc.)
-4. **Command format**: All commands follow the pattern `/feishu <resource> <operation> [arguments]`
-
-## Examples
-
-When user asks to list drive files:
-```bash
-cc-feishu-chat "/feishu drive list --folder root"
-```
-
-When user asks to create a document:
-```bash
-cc-feishu-chat "/feishu docs create --title 'My Document'"
-```
-
-When user asks to read a document:
-```bash
-cc-feishu-chat "/feishu docs read-blocks --doc <doc_token>"
-```
-
-When user asks to update a bitable record:
-```bash
-cc-feishu-chat "/feishu bitable update-record --app <app_token> --table <table_id> --record <record_id> --fields '{\"Field\":\"Value\"}'"
-```
-"""
 
 
 def setup_mcp_plugin() -> bool:
@@ -398,24 +289,6 @@ def setup_mcp_config(project_dir: Path) -> bool:
         return False
 
 
-def setup_workspace_skill(project_dir: Path) -> bool:
-    """Setup workspace skill in skills/feishu/SKILL.md"""
-    try:
-        skills_dir = project_dir / "skills" / "feishu"
-        skill_file = skills_dir / "SKILL.md"
-
-        # Create skills/feishu directory if it doesn't exist
-        skills_dir.mkdir(parents=True, exist_ok=True)
-
-        # Write skill file
-        with open(skill_file, "w", encoding="utf-8") as f:
-            f.write(SKILL_CONTENT)
-        return True
-    except Exception as e:
-        print(f"  [ERROR] {msg('warn_skill_failed')}: {e}")
-        return False
-
-
 def main():
     # Set UTF-8 encoding for Windows console
     if sys.platform == 'win32':
@@ -433,11 +306,11 @@ def main():
 
     # Detect project directory
     project_dir = Path.cwd()
-    print(f"[1/8] {msg('detect_dir')}...")
+    print(f"[1/6] {msg('detect_dir')}...")
     print(f"  -> {msg('working_dir')}: {project_dir}")
 
     # Setup MCP plugin (Claude Code)
-    print(f"\n[2/8] {msg('setup_mcp_plugin')}...")
+    print(f"\n[2/6] {msg('setup_mcp_plugin')}...")
     if setup_mcp_plugin():
         plugin_dir = Path.home() / ".claude" / "plugins" / "marketplaces" / "local" / "feishu"
         print(f"  [OK] {msg('mcp_plugin_written')} {plugin_dir}")
@@ -445,21 +318,14 @@ def main():
         print(f"  [WARN] {msg('warn_mcp_failed')}")
 
     # Setup MCP configuration (project-level, optional)
-    print(f"\n[3/8] {msg('setup_mcp')}...")
+    print(f"\n[3/6] {msg('setup_mcp')}...")
     if setup_mcp_config(project_dir):
         print(f"  [OK] {msg('mcp_written')} {project_dir / '.claude' / 'mcp.json'}")
     else:
         print(f"  [WARN] {msg('warn_mcp_failed')}")
 
-    # Setup workspace skill
-    print(f"\n[4/8] {msg('setup_skill')}...")
-    if setup_workspace_skill(project_dir):
-        print(f"  [OK] {msg('skill_written')} {project_dir / 'skills' / 'feishu' / 'SKILL.md'}")
-    else:
-        print(f"  [WARN] {msg('warn_skill_failed')}")
-
     # Load config
-    print(f"\n[5/8] {msg('load_config')}...")
+    print(f"\n[4/6] {msg('load_config')}...")
     try:
         config = load_config()
     except Exception as e:
@@ -481,7 +347,7 @@ def main():
     provider = FeishuTokenProvider(config)
 
     # Check if already authorized
-    print(f"\n[6/8] {msg('check_auth')}...")
+    print(f"\n[5/6] {msg('check_auth')}...")
     now = int(time.time())
     has_refresh_token = bool(config.user_refresh_token.strip())
     access_token_valid = bool(config.user_access_token.strip()) and now < config.user_token_expires_at - 60
@@ -518,11 +384,8 @@ def main():
                 print(f"  [ERROR] {msg('refresh_failed')}: {e}")
                 print(f"  -> {msg('will_retry')}...")
 
-    # Check if user_open_id is already known
-    has_user_open_id = bool(config.user_open_id.strip())
-
     # Start device authorization
-    print(f"\n[7/8] {msg('start_auth')}...")
+    print(f"\n[6/6] {msg('start_auth')}...")
     try:
         auth_data = provider.start_device_authorization(DEFAULT_SCOPES)
     except Exception as e:
@@ -547,39 +410,13 @@ def main():
 
     print(f"  [OK] {msg('link_generated')}")
 
-    # Send link or display it
-    print(f"\n[8/8] {msg('deliver_link')}...")
-
-    if has_user_open_id:
-        # Send to Feishu
-        print(f"  -> {msg('sending_feishu')} (open_id: {config.user_open_id[:10]}...)")
-        try:
-            client = FeishuHttpClient(config)
-            msg_service = MessagesService(client)
-            link_text = "请点击链接完成飞书授权" if LANG == 'zh' else "Click to authorize Feishu access"
-            result = msg_service.send_text(
-                config.user_open_id,
-                f"{link_text}: {verification_uri_complete}",
-                receive_id_type="open_id"
-            )
-            if result.get("code") == 0:
-                print(f"  [OK] {msg('link_sent')}")
-                print(f"\n  {msg('check_feishu')}")
-            else:
-                print(f"  [ERROR] {msg('send_failed')}: {result}")
-                print(f"\n  {msg('open_manually')}:\n  {verification_uri_complete}")
-        except Exception as e:
-            print(f"  [ERROR] {msg('send_failed')}: {e}")
-            print(f"\n  {msg('open_manually')}:\n  {verification_uri_complete}")
-    else:
-        # First time: display link
-        print(f"  -> {msg('first_time')}")
-        print("\n" + "=" * 60)
-        print(f"{msg('copy_link')}:")
-        print()
-        print(f"  {verification_uri_complete}")
-        print()
-        print("=" * 60)
+    # Display link for user to open in browser
+    print("\n" + "=" * 60)
+    print(f"{msg('copy_link')}:")
+    print()
+    print(f"  {verification_uri_complete}")
+    print()
+    print("=" * 60)
 
     # Wait for user to authorize
     print(f"\n{msg('waiting_auth')}...")

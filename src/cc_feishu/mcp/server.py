@@ -23,9 +23,7 @@ from ..providers import init_provider
 from ..services.bitable import BitableService
 from ..services.docs import DocsService
 from ..services.drive import DriveService
-from ..services.messages import MessagesService
 from ..services.sheets import SheetsService
-from ..services.slides import SlidesService
 from ..services.upload import UploadService
 
 
@@ -104,33 +102,99 @@ def _auth_start(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[
 
 
 def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[str, Any]:
+    pending = load_pending_auth_state()
+    device_code = payload.get("device_code") or pending.get("device_code")
+    if not device_code:
+        raise ValidationError("device_code is required")
+
+    interval = payload.get("interval") or pending.get("interval") or 5
+    timeout = payload.get("timeout") or 600
+    mode = payload.get("mode") or pending.get("auth_mode") or "user"
+
+    result = provider.poll_device_authorization(
+        device_code,
+        interval_seconds=int(interval),
+        timeout_seconds=int(timeout),
+        auth_mode=mode
+    )
+
+    clear_pending_auth_state()
+
+    return {
+        "ok": True,
+        "status": "authorized",
+        "message": f"User auth saved to {USER_AUTH_FILE}",
+        "user_access_token": result.get("user_access_token"),
+        "user_refresh_token": result.get("user_refresh_token"),
+        "user_token_expires_at": result.get("user_token_expires_at"),
+        "user_refresh_expires_at": result.get("user_refresh_expires_at"),
+        "user_open_id": result.get("user_open_id"),
+    }
+
+
+def _auth_import(payload: dict[str, Any]) -> dict[str, Any]:
+    user_access_token = payload.get("user_access_token", "")
+    user_refresh_token = payload.get("user_refresh_token", "")
+    user_token_expires_at = payload.get("user_token_expires_at", 0)
+    user_refresh_expires_at = payload.get("user_refresh_expires_at", 0)
+    user_open_id = payload.get("user_open_id", "")
+
+    save_user_auth_state({
+        "user_access_token": user_access_token,
+        "user_refresh_token": user_refresh_token,
+        "user_token_expires_at": user_token_expires_at,
+        "user_refresh_expires_at": user_refresh_expires_at,
+        "user_open_id": user_open_id,
+    })
+
+    return {"ok": True, "message": "User auth imported successfully"}
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="cc-feishu-mcp")
+    parser.add_argument("tool", help="Tool name")
+    parser.add_argument("--payload", default="{}", help="JSON payload")
+    args = parser.parse_args(argv)
+
+    try:
+        payload = json.loads(args.payload)
+        if not isinstance(payload, dict):
+            raise ValueError("payload must be a JSON object")
+    except Exception as e:
+        _print({"ok": False, "error": f"Invalid payload: {e}"})
+        return 1
+
+    config = load_config()
+
+    try:
+        # Auth operations
+        if args.tool == "auth.status":
+            result = _auth_status(config)
             _print(result)
-            return
+            return 0
+
+        if args.tool == "auth.start":
+            provider = FeishuTokenProvider(config)
+            result = _auth_start(provider, payload)
+            _print(result)
+            return 0
+
+        if args.tool == "auth.poll":
+            provider = FeishuTokenProvider(config)
+            result = _auth_poll(provider, payload)
+            _print(result)
+            return 0
 
         if args.tool == "auth.import":
-            # Import existing tokens
-            user_access_token = payload.get("user_access_token", "")
-            user_refresh_token = payload.get("user_refresh_token", "")
-            user_token_expires_at = payload.get("user_token_expires_at", 0)
-            user_refresh_expires_at = payload.get("user_refresh_expires_at", 0)
-            user_open_id = payload.get("user_open_id", "")
-
-            save_user_auth_state({
-                "user_access_token": user_access_token,
-                "user_refresh_token": user_refresh_token,
-                "user_token_expires_at": user_token_expires_at,
-                "user_refresh_expires_at": user_refresh_expires_at,
-                "user_open_id": user_open_id,
-            })
-
-            _print({"ok": True, "message": "User auth imported successfully"})
-            return
+            result = _auth_import(payload)
+            _print(result)
+            return 0
 
         # Validate config for resource operations
         errors = validate_config(config)
         if errors:
             _print({"ok": False, "errors": errors})
-            return
+            return 1
 
         client = init_provider(config)
 
@@ -141,8 +205,8 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload.get("folder_token", "root"),
                 payload.get("page_token")
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "drive.create_folder":
             drive = DriveService(client)
@@ -151,14 +215,14 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["name"],
                 payload.get("request_id")
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "drive.read":
             drive = DriveService(client)
             result = drive.read_file_meta(payload["file_token"])
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "drive.update":
             drive = DriveService(client)
@@ -167,28 +231,29 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 name=payload.get("name"),
                 folder_token=payload.get("folder_token")
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "drive.move":
             drive = DriveService(client)
             result = drive.move_node(
-                payload["file_token"],
+                payload.get("token") or payload["file_token"],
                 payload["target_folder_token"],
                 payload.get("request_id")
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "drive.delete":
             drive = DriveService(client)
             result = drive.delete_node(
-                payload["file_token"],
+                payload.get("token") or payload["file_token"],
                 recursive=payload.get("recursive", False),
-                request_id=payload.get("request_id")
+                request_id=payload.get("request_id"),
+                node_type=payload.get("node_type", "file")
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         # Upload operations
         if args.tool == "upload.bytes":
@@ -202,8 +267,8 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 content,
                 mime=payload.get("mime")
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         # Docs operations
         if args.tool == "docs.create":
@@ -212,20 +277,20 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["title"],
                 folder_token=payload.get("folder_token")
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "docs.read":
             docs = DocsService(client)
             result = docs.read(payload["doc_token"])
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "docs.read_blocks":
             docs = DocsService(client)
             result = docs.list_blocks(payload["doc_token"])
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "docs.append":
             docs = DocsService(client)
@@ -233,8 +298,8 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["doc_token"],
                 payload["text"]
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "docs.append_heading":
             docs = DocsService(client)
@@ -244,8 +309,8 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 level=payload.get("level", 1),
                 index=payload.get("index")
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "docs.append_bullet":
             docs = DocsService(client)
@@ -254,8 +319,8 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["text"],
                 index=payload.get("index")
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "docs.append_styled":
             docs = DocsService(client)
@@ -267,8 +332,8 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 underline=payload.get("underline", False),
                 index=payload.get("index")
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "docs.update":
             docs = DocsService(client)
@@ -277,14 +342,14 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["text"],
                 block_id=payload.get("block_id")
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "docs.delete":
             docs = DocsService(client)
             result = docs.delete(payload["doc_token"])
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         # Sheets operations
         if args.tool == "sheets.create":
@@ -293,8 +358,8 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["title"],
                 folder_token=payload.get("folder_token")
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "sheets.read_range":
             sheets = SheetsService(client)
@@ -302,8 +367,8 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["sheet_token"],
                 payload["range"]
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "sheets.write":
             sheets = SheetsService(client)
@@ -312,8 +377,8 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["range"],
                 payload["values"]
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "sheets.append_rows":
             sheets = SheetsService(client)
@@ -322,8 +387,8 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["range"],
                 payload["values"]
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "sheets.delete_range":
             sheets = SheetsService(client)
@@ -331,15 +396,15 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["sheet_token"],
                 payload["range"]
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         # Bitable operations
         if args.tool == "bitable.list_tables":
             bitable = BitableService(client)
             result = bitable.list_tables(payload["app_token"])
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "bitable.list_fields":
             bitable = BitableService(client)
@@ -347,8 +412,8 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["app_token"],
                 payload["table_id"]
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "bitable.create_table":
             bitable = BitableService(client)
@@ -356,8 +421,8 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["app_token"],
                 payload["name"]
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "bitable.read_records":
             bitable = BitableService(client)
@@ -366,8 +431,8 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["table_id"],
                 page_token=payload.get("page_token")
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "bitable.create_record":
             bitable = BitableService(client)
@@ -376,8 +441,8 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["table_id"],
                 payload["fields"]
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "bitable.update_record":
             bitable = BitableService(client)
@@ -387,8 +452,8 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["record_id"],
                 payload["fields"]
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         if args.tool == "bitable.delete_record":
             bitable = BitableService(client)
@@ -397,13 +462,15 @@ def _auth_poll(provider: FeishuTokenProvider, payload: dict[str, Any]) -> dict[s
                 payload["table_id"],
                 payload["record_id"]
             )
-            _print({"ok": True, "result": result})
-            return
+            _print({"ok": True, "tool": args.tool, "result": result})
+            return 0
 
         _print({"ok": False, "error": f"Unknown tool: {args.tool}"})
+        return 1
 
     except Exception as e:
         _print({"ok": False, "error": str(e)})
+        return 1
 
 
 if __name__ == "__main__":

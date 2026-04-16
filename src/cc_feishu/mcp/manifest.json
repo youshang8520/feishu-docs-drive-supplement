@@ -8,7 +8,6 @@
   "tools": [
     "auth.status",
     "auth.start",
-    "auth.send_link",
     "auth.poll",
     "auth.import",
     "drive.list",

@@ -482,7 +482,7 @@ def route_command(command: str) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="cc-feishu-chat", description="Feishu chat command router")
+    parser = argparse.ArgumentParser(prog="cc-feishu-router", description="Feishu chat command router")
     parser.add_argument("command", help="raw chat command, for example: /feishu auth")
     args = parser.parse_args(argv)
     print(json.dumps(route_command(args.command), ensure_ascii=False, indent=2))
