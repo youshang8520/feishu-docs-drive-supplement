@@ -14,7 +14,7 @@ A Python supplement package for cc-connect, optimized for Claude Code, that reus
   - Docs
   - Sheets
   - Bitable
-- Adds direct-content tools so explicit read requests can be answered in one step.
+- Adds direct-content tools for reading folder contents, document bodies, sheet values, and bitable records.
 
 ## Install
 
@@ -28,14 +28,14 @@ pip install git+https://github.com/youshang8520/feishu-docs-drive-supplement.git
 feishu-auth-setup
 ```
 
-This will:
+Setup actions:
 1. Configure MCP plugin for Claude Code
 2. Set up project-level MCP configuration
 3. Register the Feishu MCP server in Claude Code project scope when `claude` is available
-4. Guide you through authorization
+4. Guide user authorization
 5. Save tokens automatically
 
-After setup, restart Claude Code and you can use Feishu features naturally in conversations.
+Restart Claude Code after setup.
 
 **Examples:**
 - "List my Feishu drive files"
@@ -44,9 +44,9 @@ After setup, restart Claude Code and you can use Feishu features naturally in co
 - "Read this sheet: <url>"
 - "Read this bitable view: <url>"
 
-## For advanced users (CLI commands)
+## CLI commands
 
-If you need manual control via terminal/command line:
+Terminal / automation commands:
 
 ```bash
 # Check current state
@@ -65,7 +65,7 @@ feishu sheets read-content --sheet <sheet_token> --range A1:C10
 feishu bitable read-content --app <app_token> --table <table_id>
 ```
 
-**Note:** These are terminal commands for developers. Regular users should use Claude Code conversations.
+**Note:** These terminal commands are intended for developers. Claude Code conversations remain supported through the MCP integration.
 
 Successful user auth is persisted to `~/.cc-connect/feishu_user_auth.json`.
 

@@ -90,13 +90,13 @@ Typical tool names include:
 
 ## Why the direct-content tools matter
 
-The higher-level read tools are designed for explicit user requests like:
+The higher-level read tools cover common content retrieval scenarios such as:
 - "这个文件夹里有什么"
 - "这个文档说了啥"
 - "看下这个表格内容"
 - "看下这个多维表格数据"
 
-They return normalized content-oriented results so Claude can answer directly instead of asking for avoidable confirmation or exposing low-level raw API output.
+They return normalized content-oriented results instead of exposing low-level raw API output.
 
 ## Troubleshooting
 

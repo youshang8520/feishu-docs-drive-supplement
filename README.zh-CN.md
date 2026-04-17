@@ -18,12 +18,33 @@
   - 文档 (Docs)
   - 表格 (Sheets)
   - 多维表格 (Bitable)
-- 增加了 direct-content 工具，Claude 在用户明确要求读取内容时，可以直接读取文件夹内容、文档正文、表格内容、多维表格记录，减少多余确认
+- 增加了 direct-content 工具，用于读取文件夹内容、文档正文、表格内容、多维表格记录
 
 ## 安装
 
+### 前置条件
+
+- Python 3.10 及以上
+- 已存在的 `cc-connect` 配置，并且其中已经提供飞书应用凭证/配置
+- `claude` CLI 是可选项：存在时，`feishu-auth-setup` 会自动尝试注册 MCP；不存在时，安装与授权仍可继续，但会跳过 Claude Code 的 MCP 自动注册
+
+### 运行时依赖
+
+运行时依赖来自 `pyproject.toml`，由 `pip` 安装：
+
+- `requests`
+- Python 3.11 以下环境需要的 `tomli`
+
 ```bash
 pip install git+https://github.com/youshang8520/feishu-docs-drive-supplement.git
+```
+
+### 开发 / 测试依赖
+
+本地开发或运行测试时，安装可选 dev 依赖：
+
+```bash
+pip install -e .[dev]
 ```
 
 ## 一键设置
@@ -32,14 +53,14 @@ pip install git+https://github.com/youshang8520/feishu-docs-drive-supplement.git
 feishu-auth-setup
 ```
 
-这将：
+设置动作：
 1. 为 Claude Code 配置 MCP 插件
 2. 设置项目级 MCP 配置
 3. 在 `claude` 可用时，将 Feishu MCP 注册到 Claude Code 项目作用域
-4. 引导您完成授权
+4. 引导完成授权
 5. 自动保存 token
 
-设置完成后，重启 Claude Code，您就可以在对话中自然使用飞书功能。
+设置完成后重启 Claude Code。
 
 **使用示例：**
 - "列出我的飞书云盘文件"
@@ -49,9 +70,9 @@ feishu-auth-setup
 - "读取这个多维表格视图：<url>"
 - "创建一个叫会议记录的文档"
 
-## 高级用户（CLI 命令）
+## CLI 命令
 
-如果需要通过终端/命令行手动控制，可以直接使用 CLI 命令：
+终端 / 自动化命令：
 
 ```bash
 # 检查授权状态
@@ -161,7 +182,7 @@ pytest
 
 ### 2. 我需要手动配置飞书应用吗？
 
-通常不需要。如果你已经配置了 cc-connect 的飞书集成，本补丁会自动继承配置。
+通常不需要。已配置 cc-connect 飞书集成时，本补丁会自动继承配置。
 
 ### 3. MCP 注册需要手动吗？
 
@@ -187,4 +208,4 @@ pytest
 
 ## 贡献
 
-欢迎提交 Issue 和 Pull Request。
+Issue 和 Pull Request 可直接提交。

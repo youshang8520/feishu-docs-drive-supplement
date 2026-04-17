@@ -65,7 +65,7 @@ feishu --validate
 
 ## 5. MCP 单链接授权接入
 
-如果你要在机器人/插件里做"发一条链接让用户点授权"，直接接这组命令即可：
+机器人 / 插件接入“发送一条授权链接给用户点击”时，可直接使用这组命令：
 
 ```bash
 cc-feishu-mcp auth.status --payload '{}'

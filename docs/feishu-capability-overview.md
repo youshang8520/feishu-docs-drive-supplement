@@ -137,7 +137,7 @@ The package should be described as:
 - with CLI and MCP entrypoints
 - with strong Drive / Upload / Sheets / Bitable support
 - with basic-to-mid-level Docs support
-- with direct-content read paths for common explicit read requests
+- with direct-content read paths for common content retrieval scenarios
 - not a full standalone hosted bot runtime
 
 ## 6. Practical recommendation

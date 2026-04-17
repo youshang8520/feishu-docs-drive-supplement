@@ -18,12 +18,33 @@ A Feishu supplement for cc-connect, optimized for Claude Code. It reuses cc-conn
   - Docs
   - Sheets
   - Bitable
-- Adds direct-content tools so Claude can read folder contents, document bodies, sheet values, and bitable records without extra confirmation turns.
+- Adds direct-content tools for reading folder contents, document bodies, sheet values, and bitable records.
 
 ## Install
 
+### Prerequisites
+
+- Python 3.10 or newer
+- An existing `cc-connect` setup that already provides Feishu app credentials/configuration
+- `claude` CLI is optional: when present, `feishu-auth-setup` will try to register the MCP server automatically; when absent, setup/auth can still proceed, but Claude Code MCP auto-registration is skipped
+
+### Runtime dependencies
+
+Runtime dependencies come from `pyproject.toml` and are installed by `pip`:
+
+- `requests`
+- `tomli` on Python versions earlier than 3.11
+
 ```bash
 pip install git+https://github.com/youshang8520/feishu-docs-drive-supplement.git
+```
+
+### Development / testing dependencies
+
+For local development or test runs, install the optional dev dependencies:
+
+```bash
+pip install -e .[dev]
 ```
 
 ## One-click setup
@@ -32,14 +53,14 @@ pip install git+https://github.com/youshang8520/feishu-docs-drive-supplement.git
 feishu-auth-setup
 ```
 
-This will:
+Setup actions:
 1. Configure MCP plugin for Claude Code
 2. Set up project-level MCP configuration
 3. Register the Feishu MCP server in Claude Code project scope when `claude` is available
-4. Guide you through authorization
+4. Guide user authorization
 5. Save tokens automatically
 
-After setup, restart Claude Code and you can use Feishu features naturally in conversations.
+Restart Claude Code after setup.
 
 **Examples:**
 - "List my Feishu drive files"
@@ -49,9 +70,9 @@ After setup, restart Claude Code and you can use Feishu features naturally in co
 - "Read this bitable view: <url>"
 - "Create a document called Meeting Notes"
 
-## For advanced users (CLI commands)
+## CLI commands
 
-If you need manual control via terminal/command line, you can use CLI commands directly:
+Terminal / automation commands:
 
 ```bash
 # Check authorization status
@@ -76,7 +97,7 @@ feishu sheets read-content --sheet <sheet_token> --range A1:C10
 feishu bitable read-content --app <app_token> --table <table_id>
 ```
 
-**Note:** These are terminal commands for developers and automation. Regular users should use Claude Code conversations instead.
+**Note:** These terminal commands are intended for developers and automation. Claude Code conversations remain supported through the MCP integration.
 
 ## Capability summary
 
